@@ -1,0 +1,129 @@
+name: CI
+
+on:
+  push:
+    branches: ['6']
+  pull_request:
+    branches: ['6']
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Restrictive default for every job; jobs that publish check runs opt in.
+permissions:
+  contents: read
+
+jobs:
+  static-analysis:
+    name: Static Analysis
+    runs-on: ubuntu-latest
+    env:
+      COMPOSE: docker compose -f .docker/compose.yml -f .docker/compose.ci.yml
+      COMPOSE_BAKE: 'true'
+      CACHE_SCOPE: app-php8.3
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+    steps:
+      - uses: actions/checkout@v7
+      # Lifts the anonymous pull rate limit. Guarded on the secret so fork and
+      # Dependabot PRs fall back to anonymous pulls instead of erroring.
+      - name: Log in to Docker Hub
+        if: env.DOCKERHUB_USERNAME != ''
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - uses: arduino/setup-task@c0bc642852239c2689f73f4ea6459c29405f3c52 # v3.0.0
+        with:
+          version: 3.x
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: ./.github/actions/setup-docker-mirror
+      - run: task docker-env
+      - name: Build image (GHA layer cache)
+        run: $COMPOSE build app
+      - name: Start services
+        run: $COMPOSE up -d --wait app
+      # Composer never re-checks a path package's requirements when installing
+      # from a lock, so a new module dependency would otherwise be silently
+      # absent from every job.
+      - name: Verify the lock covers the module
+        run: $COMPOSE exec -T app /app/verify-lock.sh
+      - run: task analyse
+      # PHPStan gates some checks on the analysis target rather than the runtime
+      # PHP (e.g. #[\NoDiscard] at >= 8.5); the primary pass keeps the 8.3 floor.
+      - run: task analyse-php85
+      - run: task rector-dry
+      - run: task class-leak
+      - name: Container diagnostics
+        if: failure()
+        uses: ./.github/actions/container-diagnostics
+        with:
+          compose: ${{ env.COMPOSE }}
+
+  php-qa:
+    name: PHP QA (${{ matrix.variant }} / PHP ${{ matrix.php }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      checks: write
+    strategy:
+      fail-fast: false
+      # The modules variant installs the CMS (Versioned) and Fluent and owns the
+      # 90% coverage gate; the base variant runs on the framework alone, proving
+      # the module works without its optional integrations.
+      matrix:
+        include:
+          - { variant: modules, php: '8.3', profile: '--profile modules', service: app-modules }
+          - { variant: modules, php: '8.4', profile: '--profile modules', service: app-modules }
+          - { variant: modules, php: '8.5', profile: '--profile modules', service: app-modules }
+          - { variant: base, php: '8.3', profile: '', service: app }
+          - { variant: base, php: '8.4', profile: '', service: app }
+          - { variant: base, php: '8.5', profile: '', service: app }
+    env:
+      PHP_VERSION: ${{ matrix.php }}
+      COMPOSE: docker compose -f .docker/compose.yml -f .docker/compose.ci.yml ${{ matrix.profile }}
+      COMPOSE_BAKE: 'true'
+      CACHE_SCOPE: ${{ matrix.service }}-php${{ matrix.php }}
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Log in to Docker Hub
+        if: env.DOCKERHUB_USERNAME != ''
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - uses: arduino/setup-task@c0bc642852239c2689f73f4ea6459c29405f3c52 # v3.0.0
+        with:
+          version: 3.x
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: ./.github/actions/setup-docker-mirror
+      - run: task docker-env
+      - name: Build image (GHA layer cache)
+        run: $COMPOSE build ${{ matrix.service }}
+      - name: Start services
+        run: $COMPOSE up -d --wait ${{ matrix.service }}
+      - if: matrix.variant == 'base'
+        name: Run tests (no optional modules)
+        run: $COMPOSE exec -T ${{ matrix.service }} vendor/bin/phpunit --log-junit coverage/junit.xml
+      - if: matrix.variant == 'modules'
+        name: Run tests with coverage
+        run: >-
+          $COMPOSE exec -T ${{ matrix.service }} vendor/bin/phpunit
+          --log-junit coverage/junit.xml
+          --coverage-clover coverage/clover.xml
+      - if: matrix.variant == 'modules'
+        name: Check coverage threshold (90%)
+        run: $COMPOSE exec -T ${{ matrix.service }} vendor/bin/coverage-check coverage/clover.xml 90
+      - name: Container diagnostics
+        if: failure()
+        uses: ./.github/actions/container-diagnostics
+        with:
+          compose: ${{ env.COMPOSE }}
+      - uses: dorny/test-reporter@d1b5dff021aa968b288b02285a8bf47471c5928a # v3.2.0
+        if: always()
+        with:
+          name: PHPUnit Results (${{ matrix.variant }} / PHP ${{ matrix.php }})
+          path: coverage/junit.xml
+          reporter: java-junit

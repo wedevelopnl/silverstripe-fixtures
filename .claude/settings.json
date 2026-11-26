@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(docker compose -f .docker/compose.yml:*)",
+      "WebFetch(domain:docs.silverstripe.org)"
+    ],
+    "deny": []
+  },
+  "enabledPlugins": {
+    "php-lsp@claude-plugins-official": true
+  }
+}
