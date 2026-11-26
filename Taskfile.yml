@@ -1,0 +1,210 @@
+version: '3'
+
+# Build/dev task runner for the SilverStripe Fixtures module.
+# Install Task: https://taskfile.dev/installation
+#
+# Every exec passes -T: no target here is interactive, and older Compose
+# releases fail without a TTY otherwise.
+
+vars:
+  COMPOSE: docker compose -f .docker/compose.yml
+  COMPOSE_MODULES: docker compose -f .docker/compose.yml --profile modules
+  EXEC: docker compose -f .docker/compose.yml exec -T app
+  EXEC_MODULES: docker compose -f .docker/compose.yml --profile modules exec -T app-modules
+
+tasks:
+  # --- Docker environment ---------------------------------------------------
+
+  docker-env:
+    desc: Generate .docker/.env with deterministic ports (only if missing)
+    cmds:
+      - .docker/env.sh
+    status:
+      - test -f .docker/.env
+
+  up:
+    desc: Start the base testbed (framework only)
+    deps: [docker-env]
+    cmds:
+      - "{{.COMPOSE}} up -d --build --wait app"
+      - task: print-url
+        vars: { LABEL: Testbed, PORT_KEY: WEB_PORT }
+
+  up-modules:
+    desc: Start the optional-modules testbed (CMS + Fluent installed) next to the base one
+    deps: [docker-env]
+    cmds:
+      - "{{.COMPOSE_MODULES}} up -d --build --wait app-modules"
+      - task: print-url
+        vars: { LABEL: Optional-modules testbed, PORT_KEY: MODULES_WEB_PORT }
+
+  print-url:
+    internal: true
+    cmds:
+      - 'port=$(grep "^{{.PORT_KEY}}=" .docker/.env | cut -d= -f2); printf "\n  {{.LABEL}} running at https://localhost:%s\n\n" "$port"'
+
+  down:
+    desc: Stop services
+    deps: [docker-env]
+    cmds:
+      - "{{.COMPOSE_MODULES}} down"
+
+  destroy:
+    desc: Stop services and remove volumes
+    deps: [docker-env]
+    cmds:
+      - "{{.COMPOSE_MODULES}} down -v"
+
+  build:
+    desc: Build both testbed images without starting
+    deps: [docker-env]
+    cmds:
+      - "{{.COMPOSE_MODULES}} build app app-modules"
+
+  # Both name their service: a bare `up` brings the whole profile up with
+  # --build and recreates the container the other one just declared ready.
+  ensure-up:
+    internal: true
+    deps: [docker-env]
+    cmds:
+      - "{{.EXEC}} true 2>/dev/null || {{.COMPOSE}} up -d --build --wait app"
+
+  ensure-up-modules:
+    internal: true
+    deps: [docker-env]
+    cmds:
+      - "{{.EXEC_MODULES}} true 2>/dev/null || {{.COMPOSE_MODULES}} up -d --build --wait app-modules"
+
+  # --- Tests ----------------------------------------------------------------
+
+  test:
+    desc: Run all PHP tests in the base testbed
+    deps: [ensure-up]
+    cmds:
+      - "{{.EXEC}} vendor/bin/phpunit"
+
+  test-unit:
+    desc: Run PHP unit tests (no database or framework)
+    deps: [ensure-up]
+    cmds:
+      - "{{.EXEC}} vendor/bin/phpunit --testsuite unit"
+
+  test-integration:
+    desc: Run PHP integration tests (full SilverStripe environment)
+    deps: [ensure-up]
+    cmds:
+      - "{{.EXEC}} vendor/bin/phpunit --testsuite integration"
+
+  test-modules:
+    desc: Run all PHP tests in the optional-modules testbed
+    deps: [ensure-up-modules]
+    cmds:
+      - "{{.EXEC_MODULES}} vendor/bin/phpunit"
+
+  coverage:
+    desc: Run all tests in the optional-modules testbed with coverage (HTML + Clover)
+    deps: [ensure-up-modules]
+    cmds:
+      - "{{.EXEC_MODULES}} vendor/bin/phpunit --coverage-html coverage/html --coverage-clover coverage/clover.xml"
+
+  coverage-check:
+    desc: Check PHP coverage meets the 90% threshold
+    deps: [coverage]
+    cmds:
+      - "{{.EXEC_MODULES}} vendor/bin/coverage-check coverage/clover.xml 90"
+
+  # --- Dependency lock ------------------------------------------------------
+
+  relock:
+    desc: Regenerate the container composer locks (both variants) and follow SS6.x
+    deps: [docker-env]
+    # Resolution happens inside the built image so the platform matches what
+    # runs the tests. The image COPYs the locks, so both files must exist for
+    # the build to succeed: restore a damaged one from git, never delete it.
+    cmds:
+      - "{{.COMPOSE_MODULES}} build app app-modules"
+      - task: relock-variant
+        vars: { SERVICE: app, LOCK: composer.lock }
+      - task: relock-variant
+        vars: { SERVICE: app-modules, LOCK: composer.modules.lock }
+
+  relock-variant:
+    internal: true
+    # --entrypoint sh bypasses the boot install: the lock about to be written
+    # is the one it would install from. The mount carries the lock to the host.
+    cmds:
+      - >-
+        {{.COMPOSE_MODULES}} run --rm --no-deps -T
+        -v "$PWD/.docker/app:/lock"
+        --entrypoint sh {{.SERVICE}}
+        -c "composer update --no-install --no-scripts --no-interaction && cp composer.lock /lock/{{.LOCK}}"
+
+  verify-lock:
+    desc: Fail if the committed lock no longer covers the module's requirements
+    deps: [ensure-up]
+    cmds:
+      - "{{.EXEC}} /app/verify-lock.sh"
+
+  # --- Static analysis ------------------------------------------------------
+
+  analyse:
+    desc: Run PHPStan static analysis
+    deps: [ensure-up]
+    cmds:
+      - "{{.EXEC}} vendor/bin/phpstan analyse -c phpstan.neon.dist --memory-limit=512M"
+
+  analyse-php85:
+    desc: Run PHPStan with the analysis target pinned to PHP 8.5 (in addition to the 8.3-range primary pass)
+    deps: [ensure-up]
+    cmds:
+      - "{{.EXEC}} vendor/bin/phpstan analyse -c phpstan-php85.neon.dist --memory-limit=512M"
+
+  rector:
+    desc: Run Rector refactoring (applies changes)
+    deps: [ensure-up]
+    cmds:
+      - "{{.EXEC}} vendor/bin/rector process"
+
+  rector-dry:
+    desc: Run Rector in dry-run mode (preview only)
+    deps: [ensure-up]
+    cmds:
+      - "{{.EXEC}} vendor/bin/rector process --dry-run --no-progress-bar"
+
+  class-leak:
+    desc: Find classes in src/ that nothing references
+    deps: [ensure-up]
+    # Runs in the container: class-leak resolves skip types with is_a(), so the
+    # framework has to autoload.
+    cmds:
+      - "{{.EXEC}} vendor/bin/class-leak check /module/src"
+
+  # --- SilverStripe helpers -------------------------------------------------
+
+  flush:
+    desc: Clear the SilverStripe cache
+    deps: [ensure-up]
+    cmds:
+      - "{{.EXEC}} vendor/bin/sake flush"
+
+  db-build:
+    desc: Rebuild the database and manifest
+    deps: [ensure-up]
+    cmds:
+      - "{{.EXEC}} vendor/bin/sake db:build --flush"
+
+  # --- QA -------------------------------------------------------------------
+
+  qa:
+    desc: Run the full QA suite (all checks in parallel)
+    # The bring-ups are cmds, not deps: both create the shared `db` container,
+    # so from a cold start they would race as parallel deps.
+    deps: [docker-env]
+    cmds:
+      - task: ensure-up
+      - task: ensure-up-modules
+      - task: qa-checks
+
+  qa-checks:
+    internal: true
+    deps: [analyse, analyse-php85, rector-dry, class-leak, test, coverage-check]

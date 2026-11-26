@@ -1,0 +1,8 @@
+name: silverstripe-fixtures
+version: 1.0.0
+description: SilverStripe Fixtures — fast declarative test data loader for SilverStripe 6
+author: WeDevelop
+dependencies:
+  apm: []
+  mcp: []
+scripts: {}

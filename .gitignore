@@ -1,1 +1,18 @@
+.DS_Store
+# The module is a library: pinning its consumers' dependency graph is not ours
+# to do. The Docker test harness underneath .docker/app is an application, and
+# its locks are what stop every container boot re-resolving against Packagist.
+composer.lock
+!/.docker/app/composer.lock
+vendor/
+
+# PHPUnit
+.phpunit.cache/
+coverage/
+
+# Claude Code local config
+.claude/*.local.md
+.claude/*.local.json
+
+# StoryFlow local config
 .storyflow/
