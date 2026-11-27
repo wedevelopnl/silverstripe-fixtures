@@ -134,7 +134,7 @@ SilverStripe\Core\Injector\Injector:
         fixtures: '%$WeDevelop\Fixtures\Dev\FixtureTestState'
 ```
 
-Test classes stay as they are: they name their `$fixture_file` (one file or a list, loaded together) and look records up with `objFromFixture()`, `idFromFixture()` and `allFixtureIDs()`. Each test class loads its fixtures once and every test rolls back to them. When the class is done, the loader's clear runs instead of emptying every table.
+Test classes stay as they are: they name their `$fixture_file` (one file or a list, loaded together) and look records up with `objFromFixture()`, `idFromFixture()` and `allFixtureIDs()`. Each test class loads its fixtures once and every test rolls back to them. When the class is done, the loader's clear runs instead of emptying every table. Records a class writes outside its tests, such as the default records of `$requireDefaultRecordsFrom` or writes in `onBeforeLoadFixtures()`, outlive it unless their class is in `reset_classes`.
 
 Remove the entry to return to the framework's own fixture handling.
 
