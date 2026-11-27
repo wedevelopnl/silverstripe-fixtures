@@ -16,7 +16,7 @@ use WeDevelop\Fixtures\FixtureLoader;
  */
 final class CmsPageTest extends FunctionalTest
 {
-    private const string PAGES = 'wedevelopnl/silverstripe-fixtures:tests/Integration/fixtures/pages.yml';
+    private const string PAGES = __DIR__ . '/fixtures/pages.yml';
 
     protected $usesDatabase = true;
 

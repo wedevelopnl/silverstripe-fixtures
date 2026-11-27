@@ -23,7 +23,12 @@ use WeDevelop\Fixtures\Tests\Integration\Model\Tag;
 
 final class FixtureLoaderTest extends SapphireTest
 {
-    private const string FIXTURES = 'wedevelopnl/silverstripe-fixtures:tests/Integration/fixtures/';
+    private const string FIXTURES = __DIR__ . '/fixtures/';
+
+    /**
+     * An existing fixture named as a module resource, which the loader does not resolve.
+     */
+    private const string MODULE_RESOURCE = 'wedevelopnl/silverstripe-fixtures:tests/Integration/fixtures/tags.yml';
 
     protected $usesDatabase = true;
 
@@ -54,17 +59,25 @@ final class FixtureLoaderTest extends SapphireTest
         $this->assertSame('Second', Sub::get()->byID($loaded->idOf(Sub::class, 'second'))?->Title);
     }
 
+    public function testAPathRelativeToTheProjectRootLoads(): void
+    {
+        // The harness installs the module here
+        $loaded = FixtureLoader::singleton()->load('vendor/wedevelopnl/silverstripe-fixtures/tests/Integration/fixtures/tags.yml');
+
+        $this->assertSame(['red', 'blue'], array_keys($loaded->toArray()[Tag::class]));
+    }
+
     public function testEveryProblemOfAnInvalidSetIsListedAndNothingIsWritten(): void
     {
         try {
-            FixtureLoader::singleton()->load(self::FIXTURES . 'invalid.yml', self::FIXTURES . 'missing.yml', 'unknown/module:file.yml');
+            FixtureLoader::singleton()->load(self::FIXTURES . 'invalid.yml', self::FIXTURES . 'missing.yml', self::MODULE_RESOURCE);
             $this->fail('An invalid fixture set must be refused');
         } catch (InvalidFixtureException $exception) {
-            $where = 'wedevelopnl/silverstripe-fixtures:tests/Integration/fixtures/invalid.yml, ';
+            $where = self::FIXTURES . 'invalid.yml, ';
             $this->assertSame(
                 [
                     self::FIXTURES . 'missing.yml: no fixture file at this path',
-                    'unknown/module:file.yml: no fixture file at this path',
+                    self::MODULE_RESOURCE . ': no fixture file at this path',
                     $where . Plain::class . '.broken: "ID" is set by the loader',
                     $where . Plain::class . '.broken: "ClassName" is set by the loader',
                     $where . Plain::class . '.broken: unknown value "Subtitle"',

@@ -165,7 +165,7 @@ final readonly class Validator
         }
 
         $problems = [];
-        if (PathResolver::resolve((string) $record->source) === null) {
+        if (!is_file((string) $record->source)) {
             $problems[] = sprintf('"@source": no file at %s', $record->source);
         }
 

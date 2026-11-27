@@ -14,7 +14,6 @@ use SilverStripe\ORM\DB;
 use TractorCow\Fluent\Model\Domain;
 use TractorCow\Fluent\Model\Locale;
 use WeDevelop\Fixtures\Load\FixtureReader;
-use WeDevelop\Fixtures\Load\PathResolver;
 use WeDevelop\Fixtures\Load\RowPlanner;
 use WeDevelop\Fixtures\Load\RowWriter;
 use WeDevelop\Fixtures\Load\Validator;
@@ -41,7 +40,7 @@ class FixtureLoader
     private static array $reset_classes = [];
 
     /**
-     * @param string ...$paths module resource (`vendor/module:path`), absolute or base-relative fixture paths;
+     * @param string ...$paths absolute or project-root-relative fixture paths, as `YamlFixture` takes them;
      *                         references resolve across all of them
      *
      * @throws InvalidFixtureException listing every problem; nothing is written then
@@ -51,11 +50,11 @@ class FixtureLoader
         $files = [];
         $problems = [];
         foreach ($paths as $path) {
-            $resolved = PathResolver::resolve($path);
-            if ($resolved === null) {
-                $problems[] = $path . ': no fixture file at this path';
+            $file = Director::is_absolute($path) ? $path : Director::baseFolder() . '/' . $path;
+            if (is_file($file)) {
+                $files[$path] = $file;
             } else {
-                $files[$path] = $resolved;
+                $problems[] = $path . ': no fixture file at this path';
             }
         }
 

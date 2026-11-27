@@ -44,7 +44,22 @@ final class FixtureReaderTest extends TestCase
         $this->assertSame(['nl_NL' => ['Title' => 'Thuis']], $home->locales);
         $this->assertFalse($about->published, 'a record overrides the class default');
         $this->assertNull($logo->published);
-        $this->assertSame('wedevelopnl/silverstripe-fixtures:tests/files/logo.png', $logo->source);
+        $this->assertSame(dirname(self::DIR . 'pages.yml') . '/../../files/logo.png', $logo->source, 'a relative source is relative to its fixture file');
+        $this->assertFileEquals(__DIR__ . '/../../files/logo.png', (string) $logo->source);
+    }
+
+    public function testAnAbsoluteSourceIsKeptAsWritten(): void
+    {
+        $file = tempnam(sys_get_temp_dir(), 'fixture');
+        file_put_contents((string) $file, "SilverStripe\\Assets\\File:\n  notes:\n    '@source': /srv/files/notes.txt\n");
+
+        try {
+            $set = (new FixtureReader())->read(['absolute.yml' => (string) $file]);
+        } finally {
+            unlink((string) $file);
+        }
+
+        $this->assertSame('/srv/files/notes.txt', $set->records[0]->source);
     }
 
     public function testARecordWithoutValuesHasNoFields(): void

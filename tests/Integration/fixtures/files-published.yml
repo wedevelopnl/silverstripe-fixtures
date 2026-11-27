@@ -8,14 +8,14 @@ SilverStripe\Assets\Image:
     Name: logo.png
     Title: Logo
     Parent: =>SilverStripe\Assets\Folder.fixture_files
-    '@source': 'wedevelopnl/silverstripe-fixtures:tests/files/logo.png'
+    '@source': '../../files/logo.png'
     '@published': true
 SilverStripe\Assets\File:
   notes:
     Name: notes.txt
     Title: Notes
     Parent: =>SilverStripe\Assets\Folder.fixture_files
-    '@source': 'wedevelopnl/silverstripe-fixtures:tests/files/notes.txt'
+    '@source': '../../files/notes.txt'
     '@published': false
 WeDevelop\Fixtures\Tests\Integration\Model\Card:
   card:
