@@ -33,6 +33,11 @@ final class LedgerReset
         '_Localised_Versions' => 'RecordID',
     ];
 
+    /**
+     * The tables that hold a record's ClassName: its base table, stage and versions.
+     */
+    private const array RECORD_TABLES = ['', '_Live', '_Versions'];
+
     private DataObjectSchema $schema;
 
     /**
@@ -110,7 +115,7 @@ final class LedgerReset
     {
         $class = $this->schema->tableClass($table);
         if ($class !== null && $this->schema->baseDataTable($class) === $table) {
-            ($this->families[$table] ??= new Condition())->addRange($first, $last);
+            $this->family($table)->addRange($first, $last);
         } else {
             ($this->joinTables[$table] ??= new Condition())->addRange($first, $last);
         }
@@ -121,17 +126,11 @@ final class LedgerReset
      */
     private function addResetClass(string $class): void
     {
-        $baseTable = $this->schema->baseDataTable($class);
         $classNames = array_values(ClassInfo::subclassesFor($class));
-        $placeholders = DB::placeholders($classNames);
-        foreach ($this->existing($baseTable, ['', '_Live', '_Versions']) as $table => $column) {
-            /** @var list<int|string> $ids */
-            $ids = DB::prepared_query(
-                sprintf('SELECT DISTINCT "%s" FROM "%s" WHERE "ClassName" IN (%s)', $column, $table, $placeholders),
-                $classNames,
-            )->column();
-            ($this->families[$baseTable] ??= new Condition())->addIds(array_map(intval(...), $ids));
-        }
+        $this->addRecords(
+            $this->schema->baseDataTable($class),
+            [sprintf('"ClassName" IN (%s)', DB::placeholders($classNames)) => $classNames],
+        );
     }
 
     /**
@@ -162,16 +161,29 @@ final class LedgerReset
     private function addJoinRecords(array $join): void
     {
         $references = $this->references($join);
-        if ($references === null) {
-            return;
+        if ($references !== null) {
+            $this->addRecords($this->schema->baseDataTable($join['join']), $references);
         }
+    }
 
-        $baseTable = $this->schema->baseDataTable($join['join']);
-        foreach ($this->existing($baseTable, ['', '_Live', '_Versions']) as $table => $column) {
+    /**
+     * Adds the records of a base table that match a WHERE clause in any of their record tables.
+     *
+     * @param array<string, list<int|string>> $where a WHERE clause and its parameters
+     */
+    private function addRecords(string $baseTable, array $where): void
+    {
+        $family = $this->family($baseTable);
+        foreach ($this->existing($baseTable, self::RECORD_TABLES) as $table => $column) {
             /** @var list<int|string> $ids */
-            $ids = SQLSelect::create('DISTINCT "' . $column . '"', '"' . $table . '"', $references)->execute()->column();
-            ($this->families[$baseTable] ??= new Condition())->addIds(array_map(intval(...), $ids));
+            $ids = SQLSelect::create('DISTINCT "' . $column . '"', '"' . $table . '"', $where)->execute()->column();
+            $family->addIds(array_map(intval(...), $ids));
         }
+    }
+
+    private function family(string $baseTable): Condition
+    {
+        return $this->families[$baseTable] ??= new Condition();
     }
 
     /**
@@ -208,7 +220,7 @@ final class LedgerReset
     private function deleteFamily(string $baseTable, Condition $condition): array
     {
         $found = [];
-        foreach ($this->existing($baseTable, ['', '_Live', '_Versions']) as $table => $column) {
+        foreach ($this->existing($baseTable, self::RECORD_TABLES) as $table => $column) {
             [$sql, $parameters] = $condition->toSql($column);
             /** @var list<string> $classNames */
             $classNames = DB::prepared_query(sprintf('SELECT DISTINCT "ClassName" FROM "%s" WHERE %s', $table, $sql), $parameters)->column();
