@@ -1,0 +1,50 @@
+name: Start a testbed
+description: >-
+  Log in to Docker Hub, install Task, route image pulls through the mirror,
+  then build and start one testbed service with the job's compose
+  invocation. Run it after actions/checkout; the job's env (COMPOSE_BAKE,
+  CACHE_SCOPE, PHP_VERSION) reaches the build as it did inline.
+
+inputs:
+  compose:
+    description: The `docker compose` invocation, including every -f flag and profile.
+    required: true
+  service:
+    description: The testbed service to build and start, `app` or `app-modules`.
+    required: true
+  dockerhub-username:
+    description: Docker Hub user; empty on fork and Dependabot PRs, which then pull anonymously.
+    required: false
+    default: ''
+  dockerhub-token:
+    description: Docker Hub token for that user.
+    required: false
+    default: ''
+  github-token:
+    description: Token setup-task uses to look up Task releases without the anonymous rate limit.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    # Lifts the anonymous pull rate limit. Guarded on the secret so fork and
+    # Dependabot PRs fall back to anonymous pulls instead of erroring.
+    - name: Log in to Docker Hub
+      if: inputs.dockerhub-username != ''
+      uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+      with:
+        username: ${{ inputs.dockerhub-username }}
+        password: ${{ inputs.dockerhub-token }}
+    - uses: arduino/setup-task@c0bc642852239c2689f73f4ea6459c29405f3c52 # v3.0.0
+      with:
+        version: 3.x
+        repo-token: ${{ inputs.github-token }}
+    - uses: ./.github/actions/setup-docker-mirror
+    - shell: bash
+      run: task docker-env
+    - name: Build image (GHA layer cache)
+      shell: bash
+      run: ${{ inputs.compose }} build ${{ inputs.service }}
+    - name: Start services
+      shell: bash
+      run: ${{ inputs.compose }} up -d --wait ${{ inputs.service }}
