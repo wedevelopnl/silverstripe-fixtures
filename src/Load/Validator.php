@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace WeDevelop\Fixtures\Load;
 
+use SilverStripe\Assets\File;
+use SilverStripe\Assets\Folder;
 use SilverStripe\ORM\DataObject;
+use SilverStripe\ORM\DB;
 use WeDevelop\Fixtures\Schema\ClassSchema;
 use WeDevelop\Fixtures\Schema\FieldKind;
 use WeDevelop\Fixtures\Schema\SchemaMap;
@@ -59,6 +62,14 @@ final readonly class Validator
             }
         }
 
+        if ($record->source !== null) {
+            $problems = [...$problems, ...$this->sourceProblems($record, $schema)];
+        }
+
+        if ($schema->isFile) {
+            $problems = [...$problems, ...$this->existingFileProblems($record)];
+        }
+
         if ($record->published !== null && !$schema->versioned) {
             $problems[] = sprintf('"@published": %s has no published state', $record->class);
         } elseif ($record->published === true && !$schema->staged) {
@@ -66,6 +77,64 @@ final readonly class Validator
         }
 
         return $problems;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function sourceProblems(FixtureRecord $record, ClassSchema $schema): array
+    {
+        if (!$schema->isFile) {
+            return [sprintf('"@source": %s is not a file class', $record->class)];
+        }
+
+        $problems = [];
+        if (PathResolver::resolve((string) $record->source) === null) {
+            $problems[] = sprintf('"@source": no file at %s', $record->source);
+        }
+
+        if (!is_string($record->fields['Name'] ?? null)) {
+            $problems[] = '"Name" is required for a file with "@source"';
+        }
+
+        return $problems;
+    }
+
+    /**
+     * A file or folder may not take the place of one the site has: the load would share its file on disk, and
+     * a reset would leave the site's record pointing at a file the fixture replaced.
+     *
+     * @return list<string>
+     */
+    private function existingFileProblems(FixtureRecord $record): array
+    {
+        $name = $record->fields['Name'] ?? null;
+        if (!is_string($name) || Reference::parse($record->fields['Parent'] ?? null) !== null) {
+            // A record of this load as its parent is new, so nothing can be in its place
+            return [];
+        }
+
+        $parentId = (int) (is_numeric($record->fields['ParentID'] ?? null) ? $record->fields['ParentID'] : 0);
+        $table = (string) DataObject::getSchema()->baseDataTable(File::class);
+        $tables = DB::table_list();
+        foreach ([$table, $table . '_Live'] as $stage) {
+            if (!isset($tables[strtolower($stage)])) {
+                continue;
+            }
+
+            $query = sprintf('SELECT COUNT(*) FROM "%s" WHERE "Name" = ? AND "ParentID" = ?', $stage);
+            if ((int) DB::prepared_query($query, [$name, $parentId])->value() > 0) {
+                $folder = $parentId > 0 ? Folder::get()->byID($parentId)?->getFilename() : '';
+
+                return [sprintf(
+                    'the site already has a file or folder "%s%s"; give the test data a folder of its own',
+                    $folder,
+                    $name,
+                )];
+            }
+        }
+
+        return [];
     }
 
     /**

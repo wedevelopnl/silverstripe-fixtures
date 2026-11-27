@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `FixtureLoader`: loads fixture files in the framework's YAML shape straight into the database, in one transaction with multi-row inserts, writing the rows `DataObject::write()` would. Returns the loaded IDs by class and identifier (`LoadedFixtures`).
 - `@published` for versioned records, per class in a file or per record: published or draft-only, with one version.
+- `@source` for `File`, `Image` and `Folder` records: places the file in the asset store, public when published and protected when draft-only.
 - `FixtureLoader::reset()` and the `reset_classes` config: clears the records loaded since the last reset, recorded in the new `FixtureLedger` table, plus the records of the named classes.
 - `WeDevelop\Fixtures\Dev\FixtureTestState`: loads a SapphireTest's `$fixture_file` through the loader when set as the `fixtures` test state.
 - `InvalidFixtureException` listing every problem of a fixture set, and `ResetRefusedException` outside the dev and test environments.

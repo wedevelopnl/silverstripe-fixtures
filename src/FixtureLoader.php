@@ -4,17 +4,15 @@ declare(strict_types=1);
 
 namespace WeDevelop\Fixtures;
 
-use InvalidArgumentException;
 use LogicException;
 use SilverStripe\Control\Director;
 use SilverStripe\Core\Config\Configurable;
 use SilverStripe\Core\Injector\Injectable;
-use SilverStripe\Core\Manifest\ModuleResource;
-use SilverStripe\Core\Manifest\ModuleResourceLoader;
 use SilverStripe\ORM\DataObject;
 use SilverStripe\ORM\Connect\Database;
 use SilverStripe\ORM\DB;
 use WeDevelop\Fixtures\Load\FixtureReader;
+use WeDevelop\Fixtures\Load\PathResolver;
 use WeDevelop\Fixtures\Load\RowPlanner;
 use WeDevelop\Fixtures\Load\RowWriter;
 use WeDevelop\Fixtures\Load\Validator;
@@ -51,7 +49,7 @@ class FixtureLoader
         $files = [];
         $problems = [];
         foreach ($paths as $path) {
-            $resolved = $this->resolvePath($path);
+            $resolved = PathResolver::resolve($path);
             if ($resolved === null) {
                 $problems[] = $path . ': no fixture file at this path';
             } else {
@@ -101,24 +99,6 @@ class FixtureLoader
     private function connection(): Database
     {
         return DB::get_conn() ?? throw new LogicException('There is no database connection');
-    }
-
-    private function resolvePath(string $path): ?string
-    {
-        try {
-            $resource = ModuleResourceLoader::singleton()->resolveResource($path);
-        } catch (InvalidArgumentException) {
-            // The module the path names is not installed
-            return null;
-        }
-
-        if ($resource instanceof ModuleResource) {
-            $absolute = $resource->getPath();
-        } else {
-            $absolute = Director::is_absolute($path) ? $path : Director::baseFolder() . '/' . $path;
-        }
-
-        return is_file($absolute) ? $absolute : null;
     }
 
     /**
