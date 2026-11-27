@@ -159,6 +159,31 @@ final class RowPlannerTest extends TestCase
         $this->assertSame(['Logo (draft)', 2], [$plan->rows()['File'][0]['Title'], $plan->rows()['File'][0]['Version']]);
     }
 
+    public function testADraftValueComesAfterThePublishedValuesWhileAStatedValueKeepsTheSlotOfItsDefault(): void
+    {
+        $planner = new RowPlanner(['App\Priced' => ClassSchemas::of(
+            'App\Priced',
+            'Priced',
+            fields: ['Price' => 'Money', 'PriceAmount' => 'Decimal', 'PriceCurrency' => 'Varchar'],
+            defaults: ['PriceCurrency' => 'EUR'],
+            versioned: true,
+            staged: true,
+        )], 'FixtureLedger');
+        $price = ['Amount' => 10, 'Currency' => 'EUR'];
+
+        $rows = $planner->plan(
+            [$this->record('App\Priced', 'changed', ['Price' => $price], published: true, draft: ['PriceCurrency' => 'USD'])],
+            ['Priced' => 0],
+            self::NOW,
+            [],
+        )->rows();
+
+        $columns = ['Price' => true, 'PriceCurrency' => true];
+        $this->assertSame(['PriceCurrency' => 'EUR', 'Price' => $price], array_intersect_key($rows['Priced_Live'][0], $columns), 'write() sets a default first');
+        $this->assertSame(['Price' => $price, 'PriceCurrency' => 'USD'], array_intersect_key($rows['Priced'][0], $columns), 'an edit writes only what it changes');
+        $this->assertSame(['Price' => $price, 'PriceCurrency' => 'USD'], array_intersect_key($rows['Priced_Versions'][1], $columns));
+    }
+
     public function testValuesPerLanguageGoToTheLocalisedTables(): void
     {
         $plan = $this->plan([$this->record('App\Tag', 'red', ['Title' => 'Red'], locales: ['nl_NL' => ['Title' => 'Rood']])]);

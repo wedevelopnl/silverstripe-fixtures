@@ -39,7 +39,7 @@ final class LocalisedRowsTest extends TestCase
         $this->assertSame(
             [
                 'Page_Localised' => [
-                    ['RecordID' => 3, 'Locale' => 'nl_NL', 'ID' => 3, 'Title' => 'Thuis', 'Sort' => 2, 'Price' => ['Amount' => 5]],
+                    ['RecordID' => 3, 'Locale' => 'nl_NL', 'ID' => 3, 'Sort' => 2, 'Price' => ['Amount' => 5], 'Title' => 'Thuis'],
                     ['RecordID' => 3, 'Locale' => 'de_DE', 'ID' => 3, 'Title' => 'Home', 'Sort' => 2, 'Price' => ['Amount' => 5]],
                 ],
                 'Page_Sub_Localised' => [['RecordID' => 3, 'Locale' => 'nl_NL', 'ID' => 3], ['RecordID' => 3, 'Locale' => 'de_DE', 'ID' => 3]],
@@ -70,6 +70,29 @@ final class LocalisedRowsTest extends TestCase
         $this->assertSame(
             [['Price' => 'Money', 'PriceAmount' => 'Decimal'], ['RecordID' => true, 'Locale' => true, 'PriceAmount' => true]],
             $plan->conversions()['Page_Localised'][0],
+        );
+    }
+
+    public function testALocalesValueOfAColumnComesAfterTheRecordsCompositeThoughTheRowHeldTheColumnBeforeIt(): void
+    {
+        $schema = ClassSchemas::of(
+            'App\Page',
+            'Page',
+            fields: ['Price' => 'Money', 'PriceAmount' => 'Decimal', 'PriceCurrency' => 'Varchar'],
+            localisedTables: ['Page' => ['PriceCurrency']],
+        );
+        $plan = new Plan([]);
+        $plan->assign('App\Page.home', 'App\Page', 3);
+        $record = new FixtureRecord('a.yml', 'App\Page', 'home', [], null, ['nl_NL' => ['PriceCurrency' => 'GBP']], null, []);
+
+        LocalisedRows::add($plan, $schema, $record, ['Page' => [
+            ['ID' => 3, 'PriceCurrency' => 'EUR', 'Price' => ['Amount' => 5, 'Currency' => 'USD']],
+            ['PriceCurrency' => 'Varchar', 'Price' => 'Money'],
+        ]]);
+
+        $this->assertSame(
+            ['RecordID' => 3, 'Locale' => 'nl_NL', 'ID' => 3, 'Price' => ['Amount' => 5, 'Currency' => 'USD'], 'PriceCurrency' => 'GBP'],
+            $plan->rows()['Page_Localised'][0],
         );
     }
 

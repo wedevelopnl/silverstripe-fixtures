@@ -26,7 +26,8 @@ final class LocalisedRows
             foreach ($schema->localisedTables ?? [] as $table => $localised) {
                 // Every table, even one the record states nothing of: a first write in a locale forces every field
                 // as changed, so Fluent localises each table of the chain. A composite converts to columns of
-                // which Fluent may localise only some, so the row keeps its localised columns once converted.
+                // which Fluent may localise only some, so the row keeps its localised columns once converted. The
+                // locale's values come last: saved in that locale, they are not written over by the record's composite.
                 $columns = array_fill_keys(['RecordID', 'Locale', ...$localised], true);
                 $localeValues = array_intersect_key($values, $columns);
                 [$row, $specs] = $draftRows[$table];
@@ -34,7 +35,7 @@ final class LocalisedRows
                     $plan,
                     $schema,
                     $table . self::SUFFIX,
-                    ['RecordID' => $id, 'Locale' => $locale, ...$row, ...$localeValues],
+                    ['RecordID' => $id, 'Locale' => $locale, ...array_diff_key($row, $localeValues), ...$localeValues],
                     [...$specs, ...array_intersect_key($schema->specs, $localeValues)],
                     $columns,
                     $record->published === true,

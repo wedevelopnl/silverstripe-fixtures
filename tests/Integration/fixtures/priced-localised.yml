@@ -1,0 +1,11 @@
+# PriceCurrency has a default, so it comes before Price; the locale's value of the column must still win
+WeDevelop\Fixtures\Tests\Integration\Model\PricedRecord:
+  priced:
+    Title: Priced
+    Price:
+      Amount: 5
+      Currency: USD
+    '@published': true
+    '@locales':
+      en_US: {}
+      nl_NL: { PriceCurrency: GBP }

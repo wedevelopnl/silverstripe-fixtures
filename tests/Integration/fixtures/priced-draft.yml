@@ -1,0 +1,10 @@
+# PriceCurrency has a default, so it comes before Price; the draft value of the column must still win
+WeDevelop\Fixtures\Tests\Integration\Model\PricedRecord:
+  changed:
+    Title: Changed
+    Price:
+      Amount: 10
+      Currency: EUR
+    '@published': true
+    '@draft':
+      PriceCurrency: USD

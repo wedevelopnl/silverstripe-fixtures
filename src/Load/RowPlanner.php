@@ -216,7 +216,8 @@ final readonly class RowPlanner
     }
 
     /**
-     * The record's values with its draft values over them, validated as plain values.
+     * The record's values with its draft values after them, validated as plain values: an edit saved after
+     * publishing writes only what it changes, so a draft value of a column is not written over by its composite.
      *
      * @param array<string, mixed> $values
      * @param array<string, string> $specs
@@ -225,12 +226,10 @@ final readonly class RowPlanner
      */
     private function draftValues(FixtureRecord $record, ClassSchema $schema, array $values, array $specs): array
     {
-        foreach ($record->draft as $field => $value) {
-            $values[$field] = $value;
-            $specs[$field] = $schema->specs[$field];
-        }
-
-        return [$values, $specs];
+        return [
+            [...array_diff_key($values, $record->draft), ...$record->draft],
+            [...$specs, ...array_intersect_key($schema->specs, $record->draft)],
+        ];
     }
 
     /**
