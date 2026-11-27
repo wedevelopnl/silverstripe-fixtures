@@ -22,7 +22,8 @@
         "silverstripe/framework": "^6.0"
     },
     "suggest": {
-        "silverstripe/versioned": "Load records as published or draft-only with @published"
+        "silverstripe/versioned": "Load records as published or draft-only with @published",
+        "tractorcow/silverstripe-fluent": "Load values per language with @locales"
     },
     "require-dev": {
         "cambis/silverstan": "^2.1",

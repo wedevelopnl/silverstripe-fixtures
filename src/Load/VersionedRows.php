@@ -12,7 +12,7 @@ use WeDevelop\Fixtures\Schema\ClassSchema;
  */
 final class VersionedRows
 {
-    private const int VERSION = 1;
+    public const int VERSION = 1;
 
     /**
      * @param array<string, array<string, mixed>> $draftRows by table, each with the record's ID

@@ -8,6 +8,7 @@ use SilverStripe\Assets\File;
 use SilverStripe\Assets\Folder;
 use SilverStripe\ORM\DataObject;
 use SilverStripe\ORM\DB;
+use TractorCow\Fluent\Extension\FluentExtension;
 use WeDevelop\Fixtures\Schema\ClassSchema;
 use WeDevelop\Fixtures\Schema\FieldKind;
 use WeDevelop\Fixtures\Schema\SchemaMap;
@@ -70,10 +71,38 @@ final readonly class Validator
             $problems = [...$problems, ...$this->existingFileProblems($record)];
         }
 
+        if ($record->locales !== []) {
+            $problems = [...$problems, ...$this->localeProblems($record, $schema)];
+        }
+
         if ($record->published !== null && !$schema->versioned) {
             $problems[] = sprintf('"@published": %s has no published state', $record->class);
         } elseif ($record->published === true && !$schema->staged) {
             $problems[] = sprintf('"@published": %s is versioned without stages and has no published state', $record->class);
+        }
+
+        return $problems;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function localeProblems(FixtureRecord $record, ClassSchema $schema): array
+    {
+        if ($schema->localisedTables === null) {
+            return [class_exists(FluentExtension::class)
+                ? sprintf('"@locales": %s is not translated', $record->class)
+                : '"@locales": translations need the translation module, tractorcow/silverstripe-fluent'];
+        }
+
+        $translated = array_merge(...array_values($schema->localisedTables));
+        $problems = [];
+        foreach ($record->locales as $locale => $values) {
+            foreach (array_keys($values) as $field) {
+                if (!in_array($field, $translated, true)) {
+                    $problems[] = sprintf('"@locales": "%s" is not translated (%s)', $field, $locale);
+                }
+            }
         }
 
         return $problems;

@@ -23,6 +23,7 @@ final readonly class RowPlanner
         private SchemaMap $schemas,
         private VersionedRows $versionedRows = new VersionedRows(),
         private FilePlacer $filePlacer = new FilePlacer(),
+        private LocalisedRows $localisedRows = new LocalisedRows(),
     ) {
     }
 
@@ -84,6 +85,10 @@ final readonly class RowPlanner
             foreach ($rows as $table => $row) {
                 $plan->add($table, $row);
             }
+        }
+
+        if ($record->locales !== []) {
+            $this->localisedRows->add($plan, $schema, $record, $rows);
         }
 
         foreach ($record->fields as $field => $value) {

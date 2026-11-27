@@ -12,7 +12,12 @@ The loader reads fixture files in the framework's YAML shape, checks them agains
 - `silverstripe/framework` ^6.0
 - MySQL or MariaDB
 
-`silverstripe/versioned` is optional: install it to load published and draft-only records.
+Optional, for the features that need them:
+
+- `silverstripe/versioned`: published and draft-only records.
+- `tractorcow/silverstripe-fluent` ^8: values per language.
+
+A fixture that uses none of these features loads without them.
 
 ## Installation
 
@@ -60,6 +65,28 @@ Page:
 On a versioned class, `'@published': true` loads the record as published and `false` as draft-only. Directly under the class it is the default for that class's records in that file; a record's own `@published` overrides it.
 
 A loaded record has exactly one version: a published record is on draft and live and not modified, a draft-only record is on draft alone. Without `@published` a record is draft-only, as a plain `write()` leaves it. `@published` on a class that is not versioned, or `true` on a class versioned without stages, refuses the load.
+
+### Values per language
+
+On a class Fluent translates, `@locales` maps a locale code to the record's translated values:
+
+```yaml
+Page:
+  home:
+    Title: Home
+    URLSegment: home
+    Sort: 1
+    '@published': true
+    '@locales':
+      en_US: {}
+      nl_NL: { Title: Thuis }
+```
+
+- The record exists in each locale it names, and only those. A locale without values (`en_US: {}`) takes the record's own values.
+- A translated field the locale leaves out takes the record's value; fields Fluent does not translate are shared by every locale.
+- `@published` applies to every stated locale.
+- Only translated fields are allowed. `@locales` on a class Fluent does not translate, or without Fluent installed, refuses the load.
+- Load your `TractorCow\Fluent\Model\Locale` records as fixture data too, in the same load or an earlier one.
 
 ### Files
 
