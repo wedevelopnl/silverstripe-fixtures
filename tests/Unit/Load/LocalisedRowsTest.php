@@ -49,6 +49,30 @@ final class LocalisedRowsTest extends TestCase
         $this->assertSame(['Page_Localised' => [$page, $page], 'Page_Sub_Localised' => [$sub, $sub]], $plan->conversions());
     }
 
+    public function testACompositeColumnStatedPerLocaleIsKeptOverTheRecordsCompositeAndConvertedByItsOwnSpec(): void
+    {
+        $schema = ClassSchemas::of(
+            'App\Page',
+            'Page',
+            fields: ['Price' => 'Money', 'PriceAmount' => 'Decimal', 'PriceCurrency' => 'Varchar'],
+            localisedTables: ['Page' => ['PriceAmount']],
+        );
+        $plan = new Plan([]);
+        $plan->assign('App\Page.home', 'App\Page', 3);
+        $record = new FixtureRecord('a.yml', 'App\Page', 'home', [], null, ['nl_NL' => ['PriceAmount' => 7]], null, []);
+
+        LocalisedRows::add($plan, $schema, $record, ['Page' => [['ID' => 3, 'Price' => ['Amount' => 5, 'Currency' => 'EUR']], ['Price' => 'Money']]]);
+
+        $this->assertSame(
+            ['RecordID' => 3, 'Locale' => 'nl_NL', 'ID' => 3, 'Price' => ['Amount' => 5, 'Currency' => 'EUR'], 'PriceAmount' => 7],
+            $plan->rows()['Page_Localised'][0],
+        );
+        $this->assertSame(
+            [['Price' => 'Money', 'PriceAmount' => 'Decimal'], ['RecordID' => true, 'Locale' => true, 'PriceAmount' => true]],
+            $plan->conversions()['Page_Localised'][0],
+        );
+    }
+
     /**
      * @return iterable<string, array{bool, array<string, list<array<string, mixed>>>, array<string, mixed>}>
      */

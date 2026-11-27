@@ -304,7 +304,7 @@ final class ValidatorTest extends TestCase
         $problems = $this->problems(
             [
                 $this->record(self::PAGE, 'home', locales: [
-                    'nl_NL' => ['Sort' => 2, 'Unknown' => 'x', 'Title' => '=>' . self::TAG . '.red'],
+                    'nl_NL' => ['Sort' => 2, 'Unknown' => 'x', 'Price' => ['Amount' => 7], 'PriceAmount' => 7, 'Title' => '=>' . self::TAG . '.red'],
                     'nl_NLL' => ['Title' => 'Thuis'],
                     'de_DE' => ['Title' => 'Heim'],
                     'fr_FR' => ['Content' => 'Accueil'],
@@ -320,6 +320,7 @@ final class ValidatorTest extends TestCase
             [
                 $label . '"Sort" is not translated (nl_NL)',
                 $label . '"Unknown" is not translated (nl_NL)',
+                $label . '"Price" is not translated (nl_NL)',
                 $label . '"Title" cannot hold a reference (nl_NL)',
                 $label . 'no Locale "nl_NLL" in this load or the database',
                 'a.yml, App\Tag.red: "@locales": App\Tag is not translated',
@@ -419,10 +420,10 @@ final class ValidatorTest extends TestCase
             self::PAGE => ClassSchemas::of(
                 self::PAGE,
                 'Page',
-                fields: ['Title' => 'Varchar', 'Content' => 'HTMLText', 'Sort' => 'Int'],
+                fields: ['Title' => 'Varchar', 'Content' => 'HTMLText', 'Sort' => 'Int', 'Price' => 'Money', 'PriceAmount' => 'Decimal'],
                 versioned: true,
                 staged: true,
-                localisedTables: ['Page' => ['Title', 'Content']],
+                localisedTables: ['Page' => ['Title', 'Content', 'PriceAmount']],
             ),
             self::UNSTAGED => ClassSchemas::of(self::UNSTAGED, 'Unstaged', fields: ['Title' => 'Varchar'], versioned: true),
             self::LOCALE => ClassSchemas::of(self::LOCALE, 'Locale', fields: ['Locale' => 'Varchar'], isLocale: true),
