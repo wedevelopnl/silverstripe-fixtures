@@ -294,11 +294,15 @@ final readonly class RowPlanner
             $columns[] = sprintf('GREATEST(%s) AS "%s"', implode(', ', $maxima), $table);
         }
 
-        $floors = self::withLiveStatistics(
-            static fn (): ?array => DB::prepared_query('SELECT ' . implode(', ', $columns), $parameters)->record(),
+        $row = $this->withLiveStatistics(
+            static fn (): array => DB::prepared_query('SELECT ' . implode(', ', $columns), $parameters)->record(),
         );
+        $floors = [];
+        foreach ($row as $table => $floor) {
+            $floors[(string) $table] = is_numeric($floor) ? (int) $floor : 0;
+        }
 
-        return array_map(intval(...), $floors ?? []);
+        return $floors;
     }
 
     /**
@@ -311,7 +315,7 @@ final readonly class RowPlanner
      *
      * @return T
      */
-    private static function withLiveStatistics(callable $query): mixed
+    private function withLiveStatistics(callable $query): mixed
     {
         $expiry = DB::query("SHOW VARIABLES LIKE 'information_schema_stats_expiry'")->record()['Value'] ?? null;
         if (!is_numeric($expiry)) {
