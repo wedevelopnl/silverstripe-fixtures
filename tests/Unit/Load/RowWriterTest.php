@@ -11,16 +11,16 @@ use WeDevelop\Fixtures\Load\RowWriter;
 #[CoversClass(RowWriter::class)]
 final class RowWriterTest extends TestCase
 {
-    public function testRowsStatingDifferentColumnsGoInSeparateInsertsWithQuotedColumns(): void
+    public function testRowsStatingDifferentColumnsGoInSeparateInsertsAndTheSameColumnsInAnyOrderInOne(): void
     {
         $batches = RowWriter::batches([
-            'Page' => [['ID' => 1, 'Title' => 'Home'], ['ID' => 2], ['ID' => 3, 'Title' => 'About']],
+            'Page' => [['ID' => 1, 'Title' => 'Home'], ['ID' => 2], ['Title' => 'About', 'ID' => 3]],
             'Tag' => [['ID' => 4]],
         ]);
 
         $this->assertSame(
             [
-                ['Page', [['"ID"' => 1, '"Title"' => 'Home'], ['"ID"' => 3, '"Title"' => 'About']]],
+                ['Page', [['"ID"' => 1, '"Title"' => 'Home'], ['"Title"' => 'About', '"ID"' => 3]]],
                 ['Page', [['"ID"' => 2]]],
                 ['Tag', [['"ID"' => 4]]],
             ],

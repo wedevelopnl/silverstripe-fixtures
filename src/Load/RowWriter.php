@@ -29,7 +29,8 @@ final class RowWriter
     /**
      * The inserts the rows take: one per table and column set, split where it would pass the parameter limit.
      * The query builder fills a column a row leaves out with NULL, which would override the column's default, so
-     * rows that state different columns go in separate inserts.
+     * rows that state different columns go in separate inserts. It writes each row's values by column name, so rows
+     * that state the same columns in another order share one.
      *
      * @param array<string, list<array<string, mixed>>> $rows
      *
@@ -41,7 +42,9 @@ final class RowWriter
         foreach ($rows as $table => $tableRows) {
             $groups = [];
             foreach ($tableRows as $row) {
-                $groups[implode(',', array_keys($row))][] = $row;
+                $columns = array_keys($row);
+                sort($columns);
+                $groups[implode(',', $columns)][] = $row;
             }
 
             foreach ($groups as $group) {
