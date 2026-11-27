@@ -200,7 +200,7 @@ final class FluentFixtureTest extends SapphireTest
         $this->requireFluent();
 
         try {
-            FixtureLoader::singleton()->load(self::FIXTURES . 'localised-invalid.yml');
+            FixtureLoader::singleton()->load(self::FIXTURES . 'locales.yml', self::FIXTURES . 'localised-invalid.yml');
             $this->fail('Values of fields that are not translated must be refused');
         } catch (InvalidFixtureException $exception) {
             $where = self::FIXTURES . 'localised-invalid.yml, ' . LocalisedRecord::class . '.home: "@locales": ';
@@ -209,6 +209,7 @@ final class FluentFixtureTest extends SapphireTest
                     $where . '"Sort" is not translated (nl_NL)',
                     $where . '"Unknown" is not translated (nl_NL)',
                     $where . '"Title" cannot hold a reference (nl_NL)',
+                    $where . 'no Locale "nl_NLL" in this load or the database',
                     self::FIXTURES . 'localised-invalid.yml, ' . Tag::class . '.red: "@locales": ' . Tag::class . ' is not translated',
                 ],
                 $exception->getProblems(),

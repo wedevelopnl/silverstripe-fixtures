@@ -9,6 +9,7 @@ use SilverStripe\Assets\Folder;
 use SilverStripe\ORM\DataObject;
 use SilverStripe\ORM\DB;
 use TractorCow\Fluent\Extension\FluentExtension;
+use TractorCow\Fluent\Model\Locale;
 use WeDevelop\Fixtures\Schema\ClassSchema;
 use WeDevelop\Fixtures\Schema\FieldKind;
 use WeDevelop\Fixtures\Schema\SchemaMap;
@@ -38,6 +39,7 @@ final readonly class Validator
         $problems = [];
         $places = [];
         $pairs = [];
+        $localeCodes = $this->localeCodes($records);
         foreach ($records as $record) {
             $class = $this->schemas->resolve($record->class);
             if ($class === null) {
@@ -46,7 +48,7 @@ final readonly class Validator
             }
 
             $schema = $this->schemas->forClass($class);
-            $recordProblems = [...$this->recordProblems($record, $schema, $keys), ...$this->joinPairProblems($record, $schema, $keys, $pairs)];
+            $recordProblems = [...$this->recordProblems($record, $schema, $keys, $localeCodes), ...$this->joinPairProblems($record, $schema, $keys, $pairs)];
             if ($schema->isFile) {
                 $recordProblems = [...$recordProblems, ...$this->samePlaceProblems($record, $places), ...$this->parentCycleProblems($record, $keys)];
             }
@@ -61,10 +63,11 @@ final readonly class Validator
 
     /**
      * @param array<string, FixtureRecord> $keys every record of the load, by reference name
+     * @param array<string, true> $localeCodes
      *
      * @return list<string>
      */
-    private function recordProblems(FixtureRecord $record, ClassSchema $schema, array $keys): array
+    private function recordProblems(FixtureRecord $record, ClassSchema $schema, array $keys, array $localeCodes): array
     {
         $problems = [];
         foreach ($record->fields as $field => $value) {
@@ -83,7 +86,7 @@ final readonly class Validator
         }
 
         if ($record->locales !== []) {
-            $problems = [...$problems, ...$this->localeProblems($record, $schema)];
+            $problems = [...$problems, ...$this->localeProblems($record, $schema, $localeCodes)];
         }
 
         if ($record->published !== null && !$schema->versioned) {
@@ -96,9 +99,36 @@ final readonly class Validator
     }
 
     /**
+     * The locale codes Fluent finds a Locale for: those of the load's Locale records and of the database. Fluent
+     * writes the found Locale's own code, so only the exact code yields the rows write() leaves.
+     *
+     * @param list<FixtureRecord> $records
+     *
+     * @return array<string, true>
+     */
+    private function localeCodes(array $records): array
+    {
+        if (!class_exists(Locale::class) || array_filter($records, static fn (FixtureRecord $record): bool => $record->locales !== []) === []) {
+            return [];
+        }
+
+        $codes = Locale::get()->column('Locale');
+        foreach ($records as $record) {
+            $class = $this->schemas->resolve($record->class);
+            if ($class !== null && is_a($class, Locale::class, true)) {
+                $codes[] = $record->fields['Locale'] ?? null;
+            }
+        }
+
+        return array_fill_keys(array_filter($codes, is_string(...)), true);
+    }
+
+    /**
+     * @param array<string, true> $localeCodes
+     *
      * @return list<string>
      */
-    private function localeProblems(FixtureRecord $record, ClassSchema $schema): array
+    private function localeProblems(FixtureRecord $record, ClassSchema $schema, array $localeCodes): array
     {
         if ($schema->localisedTables === null) {
             return [class_exists(FluentExtension::class)
@@ -109,6 +139,10 @@ final readonly class Validator
         $translated = array_merge(...array_values($schema->localisedTables));
         $problems = [];
         foreach ($record->locales as $locale => $values) {
+            if (!isset($localeCodes[$locale])) {
+                $problems[] = sprintf('"@locales": no Locale "%s" in this load or the database', $locale);
+            }
+
             foreach ($values as $field => $value) {
                 if (!in_array($field, $translated, true)) {
                     $problems[] = sprintf('"@locales": "%s" is not translated (%s)', $field, $locale);
