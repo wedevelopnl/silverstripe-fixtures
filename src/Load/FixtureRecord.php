@@ -38,4 +38,14 @@ final readonly class FixtureRecord
     {
         return $this->file . ', ' . $this->key();
     }
+
+    /**
+     * The folder a file record is placed in by ID: its ParentID, or the root (0) when that is not a positive number.
+     */
+    public function parentId(): int
+    {
+        $parentId = $this->fields['ParentID'] ?? 0;
+
+        return is_numeric($parentId) && $parentId > 0 ? (int) $parentId : 0;
+    }
 }

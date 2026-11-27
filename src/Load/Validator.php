@@ -52,7 +52,7 @@ final readonly class Validator
 
             $name = $record->fields['Name'] ?? null;
             if (is_string($name) && Reference::parse($record->fields['Parent'] ?? null) === null) {
-                $files[] = [$name, $this->parentId($record)];
+                $files[] = [$name, $record->parentId()];
             }
         }
 
@@ -261,7 +261,7 @@ final readonly class Validator
             return [];
         }
 
-        $parentId = $this->parentId($record);
+        $parentId = $record->parentId();
         if (!in_array($name, $lookups->existingFiles[$parentId] ?? [], true)) {
             return [];
         }
@@ -271,13 +271,6 @@ final readonly class Validator
             $lookups->folderNames[$parentId] ?? '',
             $name,
         )];
-    }
-
-    private function parentId(FixtureRecord $record): int
-    {
-        $parentId = $record->fields['ParentID'] ?? null;
-
-        return (int) (is_numeric($parentId) ? $parentId : 0);
     }
 
     /**
@@ -294,9 +287,7 @@ final readonly class Validator
             return [];
         }
 
-        $parentId = $record->fields['ParentID'] ?? 0;
-        $parent = Reference::parse($record->fields['Parent'] ?? null) ?? (is_numeric($parentId) ? (int) $parentId : 0);
-        $place = $parent . '/' . $name;
+        $place = (Reference::parse($record->fields['Parent'] ?? null) ?? $record->parentId()) . '/' . $name;
         if (isset($places[$place])) {
             return [sprintf('"%s" is also the name of %s in the same folder', $name, $places[$place])];
         }

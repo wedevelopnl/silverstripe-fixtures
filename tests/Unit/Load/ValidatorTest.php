@@ -22,6 +22,7 @@ use WeDevelop\Fixtures\Tests\Unit\ClassSchemas;
 #[CoversClass(Lookups::class)]
 #[CoversClass(Reference::class)]
 #[CoversClass(ManyManyItem::class)]
+#[CoversClass(FixtureRecord::class)]
 final class ValidatorTest extends TestCase
 {
     private const string PLAIN = 'App\Plain';
@@ -238,14 +239,16 @@ final class ValidatorTest extends TestCase
                 $this->record(self::FILE, 'in_site_folder', ['Name' => 'logo.png', 'ParentID' => 7]),
                 $this->record(self::FILE, 'elsewhere', ['Name' => 'logo.png', 'ParentID' => 8]),
                 $this->record(self::FILE, 'below_a_new_folder', ['Name' => 'logo.png', 'Parent' => '=>' . self::FILE . '.root']),
+                $this->record(self::FILE, 'below_no_folder', ['Name' => 'downloads', 'ParentID' => -3]),
             ],
-            new Lookups(null, [0 => ['uploads'], 7 => ['logo.png'], 8 => ['other.png']], [7 => 'site-folder/'], []),
+            new Lookups(null, [0 => ['uploads', 'downloads'], 7 => ['logo.png'], 8 => ['other.png']], [7 => 'site-folder/'], []),
         );
 
         $this->assertSame(
             [
                 'a.yml, App\File.root: the site already has a file or folder "uploads"; give the test data a folder of its own',
                 'a.yml, App\File.in_site_folder: the site already has a file or folder "site-folder/logo.png"; give the test data a folder of its own',
+                'a.yml, App\File.below_no_folder: the site already has a file or folder "downloads"; give the test data a folder of its own',
             ],
             $problems,
         );
@@ -259,12 +262,14 @@ final class ValidatorTest extends TestCase
             $this->record(self::FILE, 'readme', ['Name' => 'readme.txt', 'Parent' => '=>' . self::FILE . '.uploads']),
             $this->record(self::FILE, 'readme_copy', ['Name' => 'readme.txt', 'Parent' => '=>' . self::FILE . '.uploads']),
             $this->record(self::FILE, 'readme_in_root', ['Name' => 'readme.txt', 'ParentID' => 0]),
+            $this->record(self::FILE, 'readme_below_no_folder', ['Name' => 'readme.txt', 'ParentID' => -1]),
         ]);
 
         $this->assertSame(
             [
                 'a.yml, App\File.uploads_again: "Uploads" is also the name of App\File.uploads in the same folder',
                 'a.yml, App\File.readme_copy: "readme.txt" is also the name of App\File.readme in the same folder',
+                'a.yml, App\File.readme_below_no_folder: "readme.txt" is also the name of App\File.readme_in_root in the same folder',
             ],
             $problems,
         );
@@ -347,13 +352,14 @@ final class ValidatorTest extends TestCase
             $this->record(self::PAGE, 'home', locales: ['nl_NL' => ['Title' => 'Thuis']]),
             $this->record(self::FILE, 'root', ['Name' => 'uploads']),
             $this->record(self::FILE, 'in_site_folder', ['Name' => 'logo.png', 'ParentID' => '7'], source: '/files/logo.png'),
+            $this->record(self::FILE, 'below_no_folder', ['Name' => 'notes.txt', 'ParentID' => -3]),
             $this->record(self::TAG, 'red', source: '/files/notes.txt'),
         ];
 
         $request = $this->validator()->needs($records);
 
         $this->assertSame(
-            [true, [['uploads', 0], ['logo.png', 7]], ['/files/logo.png']],
+            [true, [['uploads', 0], ['logo.png', 7], ['notes.txt', 0]], ['/files/logo.png']],
             [$request->locales, $request->files, $request->sources],
         );
         $this->assertFalse((new Validator($this->schemas(), false))->needs($records)->locales, 'without the translation module');

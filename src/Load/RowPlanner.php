@@ -77,7 +77,7 @@ final readonly class RowPlanner
                 $record = $byKey[$parent];
             }
 
-            $id = $this->parentId($record);
+            $id = $record->parentId();
             if ($id > 0) {
                 $ids[$id] = $id;
             }
@@ -347,14 +347,7 @@ final readonly class RowPlanner
             return $this->filename($byKey[$parent], $byKey, $folders) . '/' . $name;
         }
 
-        return ($folders[$this->parentId($record)] ?? '') . $name;
-    }
-
-    private function parentId(FixtureRecord $record): int
-    {
-        $parentId = $record->fields['ParentID'] ?? 0;
-
-        return is_numeric($parentId) && $parentId > 0 ? (int) $parentId : 0;
+        return ($folders[$record->parentId()] ?? '') . $name;
     }
 
     /**
