@@ -21,8 +21,6 @@ use WeDevelop\Fixtures\ResetRefusedException;
  */
 class FixturesTask extends BuildTask
 {
-    private const array ACTIONS = ['load', 'unload', 'reset'];
-
     protected static string $commandName = 'fixtures';
 
     protected string $title = 'Load, unload or reset fixtures';
@@ -32,7 +30,7 @@ class FixturesTask extends BuildTask
     public function getOptions(): array
     {
         return [
-            new InputOption('action', null, InputOption::VALUE_REQUIRED, 'load, unload, or reset (unload, then load)', null, self::ACTIONS),
+            new InputOption('action', null, InputOption::VALUE_REQUIRED, 'load, unload, or reset (unload, then load)', null, FixturesTaskRules::ACTIONS),
             new InputOption(
                 'file',
                 null,
@@ -55,18 +53,14 @@ class FixturesTask extends BuildTask
         $files = $input->getOption('file');
         /** @var list<string> $dirs */
         $dirs = $input->getOption('dir');
-        if (!in_array($action, self::ACTIONS, true)) {
-            $output->writeln('<error>Name an action: --action=load, --action=unload or --action=reset</error>');
+        $problem = FixturesTaskRules::optionProblem($action, $files, $dirs);
+        if ($problem !== null) {
+            $output->writeln('<error>' . $problem . '</error>');
 
             return Command::INVALID;
         }
 
-        if ($action !== 'unload' && $files === [] && $dirs === []) {
-            $output->writeln('<error>Name at least one fixture file with --file or directory with --dir</error>');
-
-            return Command::INVALID;
-        }
-
+        /** @var value-of<FixturesTaskRules::ACTIONS> $action checked above */
         $loader = FixtureLoader::singleton();
         try {
             match ($action) {
@@ -90,48 +84,28 @@ class FixturesTask extends BuildTask
      * @param list<string> $files
      * @param list<string> $dirs
      *
-     * @return list<string> the files, then each directory's .yml and .yaml files sorted by name, prefixed with the
-     *                      directory as given
+     * @return list<string>
      *
      * @throws InvalidFixtureException naming each directory that is missing or holds no fixture file
      */
     private function paths(array $files, array $dirs): array
     {
-        $problems = [];
+        $listings = [];
         foreach ($dirs as $dir) {
             $absolute = Director::is_absolute($dir) ? $dir : Director::baseFolder() . '/' . $dir;
-            if (!is_dir($absolute)) {
-                $problems[] = $dir . ': no directory at this path';
-                continue;
-            }
-
-            $names = array_filter(
+            $listings[] = [$dir, is_dir($absolute) ? array_values(array_filter(
                 scandir($absolute) ?: [],
-                static fn (string $name): bool => in_array(pathinfo($name, PATHINFO_EXTENSION), ['yml', 'yaml'], true)
-                    && is_file($absolute . '/' . $name),
-            );
-            if ($names === []) {
-                $problems[] = $dir . ': no .yml or .yaml file in this directory';
-            }
-
-            foreach ($names as $name) {
-                $files[] = rtrim($dir, '/') . '/' . $name;
-            }
+                static fn (string $name): bool => is_file($absolute . '/' . $name),
+            )) : null];
         }
 
-        if ($problems !== []) {
-            throw new InvalidFixtureException($problems);
-        }
-
-        return $files;
+        return FixturesTaskRules::paths($files, $listings);
     }
 
     private function report(LoadedFixtures $loaded, PolyOutput $output): void
     {
-        foreach ($loaded->toArray() as $class => $identifiers) {
-            foreach ($identifiers as $identifier => $id) {
-                $output->writeln(OutputFormatter::escape(sprintf('%s.%s: %d', $class, $identifier, $id)));
-            }
+        foreach (FixturesTaskRules::reportLines($loaded) as $line) {
+            $output->writeln(OutputFormatter::escape($line));
         }
     }
 }
