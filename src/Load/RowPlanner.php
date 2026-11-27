@@ -79,13 +79,12 @@ final readonly class RowPlanner
     private function planRecord(Plan $plan, FixtureRecord $record, ClassSchema $schema, string $now, array $fileValues): void
     {
         $id = $plan->idOf($record->key());
-        $rows = array_fill_keys($schema->tables, ['ID' => $id]);
-        foreach ([...$this->values($plan, $record, $schema, $now), ...$fileValues] as $column => $value) {
-            $rows[$schema->columnTables[$column]][$column] = $value;
-        }
+        $values = [...$this->values($plan, $record, $schema, $now), ...$fileValues];
+        $rows = $this->rowsByTable($schema, $id, $values);
 
         if ($schema->versioned) {
-            VersionedRows::add($plan, $schema, $rows, $record->published === true);
+            $draftRows = $record->draft === [] ? null : $this->rowsByTable($schema, $id, $this->draftValues($record, $schema, $values));
+            VersionedRows::add($plan, $schema, $rows, $record->published === true, $draftRows);
         } else {
             foreach ($rows as $table => $row) {
                 $plan->add($table, $row);
@@ -101,6 +100,37 @@ final readonly class RowPlanner
                 $this->planJoinRows($plan, $schema->class, $field, $id, $value);
             }
         }
+    }
+
+    /**
+     * The record's column values with its draft values over them, validated as plain values.
+     *
+     * @param array<string, mixed> $values by column
+     *
+     * @return array<string, mixed>
+     */
+    private function draftValues(FixtureRecord $record, ClassSchema $schema, array $values): array
+    {
+        foreach ($record->draft as $field => $value) {
+            $values = [...$values, ...$schema->columnValues($field, $value)];
+        }
+
+        return $values;
+    }
+
+    /**
+     * @param array<string, mixed> $values by column
+     *
+     * @return array<string, array<string, mixed>> by table, each with the record's ID
+     */
+    private function rowsByTable(ClassSchema $schema, int $id, array $values): array
+    {
+        $rows = array_fill_keys($schema->tables, ['ID' => $id]);
+        foreach ($values as $column => $value) {
+            $rows[$schema->columnTables[$column]][$column] = $value;
+        }
+
+        return $rows;
     }
 
     /**

@@ -51,42 +51,62 @@ trait RowSnapshot
     }
 
     /**
-     * write() and publish leave a version row per write, the loader one by design: no edit history. Keeps the
-     * latest version row of each record and locale, and takes the Version column out of every row, since the
-     * numbers differ by that history.
+     * write() and publish leave a version row per write; the loader only the versions a record ends with: the
+     * published one, and a draft change after it. Keeps the newest $count version rows of each record and locale and
+     * numbers them from 1, in the version rows and in the draft and live rows that name them, so rows compare equal
+     * when they hold the same versions in the same order. A draft or live row naming an older version gets none.
      *
      * @param array<string, list<array<string, mixed>>> $snapshot
      *
-     * @return array{array<string, list<array<string, mixed>>>, list<mixed>} the rows, and the Version values they held
+     * @return array<string, list<array<string, mixed>>>
      */
-    private function latestVersionOnly(array $snapshot): array
+    private function latestVersions(array $snapshot, int $count): array
     {
-        $versions = [];
+        $numbers = [];
         foreach ($snapshot as $table => $rows) {
-            if (str_ends_with($table, '_Versions')) {
-                $latest = [];
-                foreach ($rows as $row) {
-                    $group = json_encode([$row['RecordID'], $row['Locale'] ?? null]);
-                    if (!isset($latest[$group]) || $row['Version'] > $latest[$group]['Version']) {
-                        $latest[$group] = $row;
+            if (!str_ends_with($table, '_Versions')) {
+                continue;
+            }
+
+            $versions = [];
+            foreach ($rows as $row) {
+                $versions[$this->versionOwner($row)][] = $row['Version'];
+            }
+
+            foreach ($versions as $owner => $owned) {
+                sort($owned);
+                $kept = array_slice($owned, -$count);
+                $numbers[$table][$owner] = array_combine($kept, range(1, count($kept)));
+            }
+        }
+
+        foreach ($snapshot as $table => $rows) {
+            $versionsTable = str_ends_with($table, '_Versions') ? $table : preg_replace('/_Live$/', '', $table) . '_Versions';
+            $renumbered = [];
+            foreach ($rows as $row) {
+                if (array_key_exists('Version', $row)) {
+                    $row['Version'] = $numbers[$versionsTable][$this->versionOwner($row)][$row['Version']] ?? null;
+                    if ($row['Version'] === null && $versionsTable === $table) {
+                        continue;
                     }
                 }
 
-                $rows = array_values($latest);
+                $renumbered[] = $row;
             }
 
-            foreach ($rows as $index => $row) {
-                if (array_key_exists('Version', $row)) {
-                    $versions[] = $row['Version'];
-                    unset($rows[$index]['Version']);
-                }
-            }
-
-            usort($rows, static fn (array $a, array $b): int => json_encode($a) <=> json_encode($b));
-            $snapshot[$table] = $rows;
+            usort($renumbered, static fn (array $a, array $b): int => json_encode($a) <=> json_encode($b));
+            $snapshot[$table] = $renumbered;
         }
 
-        return [$snapshot, array_values(array_unique($versions))];
+        return $snapshot;
+    }
+
+    /**
+     * @param array<string, mixed> $row a draft, live or version row
+     */
+    private function versionOwner(array $row): string
+    {
+        return (string) json_encode([$row['RecordID'] ?? $row['ID'], $row['Locale'] ?? null]);
     }
 
     /**

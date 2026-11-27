@@ -19,6 +19,8 @@ final class FixtureReader
 
     private const string SOURCE = '@source';
 
+    private const string DRAFT = '@draft';
+
     /**
      * Parsed files for the life of the process, keyed by path; a changed modification time invalidates an entry.
      *
@@ -115,6 +117,8 @@ final class FixtureReader
             $identifier = (string) $identifier;
             if ($identifier === self::PUBLISHED) {
                 $published = $this->readPublished($where, $values, $problems);
+            } elseif ($identifier === self::DRAFT) {
+                $problems[] = sprintf('%s: "%s" belongs on a record, not on a class', $where, self::DRAFT);
             } elseif (str_starts_with($identifier, '@')) {
                 $problems[] = sprintf('%s: unknown loader key "%s"', $where, $identifier);
             } elseif (preg_match('/\s/', $identifier) === 1) {
@@ -151,6 +155,7 @@ final class FixtureReader
         $fields = [];
         $locales = [];
         $source = null;
+        $draft = [];
         foreach ($values as $key => $value) {
             $key = (string) $key;
             if ($key === self::PUBLISHED) {
@@ -159,6 +164,8 @@ final class FixtureReader
                 $locales = $this->readLocales($where, $value, $problems);
             } elseif ($key === self::SOURCE) {
                 $source = $this->readSource($where, $value, dirname($path), $problems);
+            } elseif ($key === self::DRAFT) {
+                $draft = $this->readDraft($where, $value, $problems);
             } elseif (str_starts_with($key, '@')) {
                 $problems[] = sprintf('%s: unknown loader key "%s"', $where, $key);
             } else {
@@ -166,7 +173,7 @@ final class FixtureReader
             }
         }
 
-        return new FixtureRecord($label, $class, $identifier, $fields, $published, $locales, $source);
+        return new FixtureRecord($label, $class, $identifier, $fields, $published, $locales, $source, $draft);
     }
 
     /**
@@ -205,6 +212,22 @@ final class FixtureReader
         }
 
         return $locales;
+    }
+
+    /**
+     * @param list<string> $problems
+     *
+     * @return array<string, mixed>
+     */
+    private function readDraft(string $where, mixed $value, array &$problems): array
+    {
+        if (!is_array($value) || $value === [] || array_is_list($value)) {
+            $problems[] = sprintf('%s: "%s" must map field values', $where, self::DRAFT);
+
+            return [];
+        }
+
+        return array_combine(array_map(strval(...), array_keys($value)), $value);
     }
 
     /**

@@ -88,6 +88,98 @@ final class VersionedFixtureTest extends SapphireTest
             ->byID($loaded->idOf(VersionedSub::class, 'sub'))?->Extra);
     }
 
+    public function testAPublishedRecordWithDraftValuesIsModifiedOnDraftWithTwoVersions(): void
+    {
+        // A draft value equal to the published one is still a draft change
+        $loaded = FixtureLoader::singleton()->load(self::FIXTURES . 'versioned-modified.yml', self::FIXTURES . 'versioned-modified-same.yml');
+
+        foreach ([[VersionedRecord::class, 'changed'], [VersionedRecord::class, 'same'], [VersionedSub::class, 'sub']] as [$class, $identifier]) {
+            $record = $this->record($loaded, $class, $identifier);
+            $this->assertTrue($record->isPublished(), $identifier . ' is published');
+            $this->assertTrue($record->isModifiedOnDraft(), $identifier . ' is modified on draft');
+            $this->assertArrayHasKey('modified', $record->getStatusFlags(), $identifier . ' carries the modified flag');
+            $this->assertSame(2, $record->Versions()->count(), $identifier . ' has the published version and the draft change');
+        }
+
+        $changed = $loaded->idOf(VersionedRecord::class, 'changed');
+        $sub = $loaded->idOf(VersionedSub::class, 'sub');
+        $this->assertSame('Published', $this->onStage(Versioned::LIVE, VersionedRecord::class, $changed)?->Title);
+        $this->assertSame('Draft', $this->onStage(Versioned::DRAFT, VersionedRecord::class, $changed)?->Title);
+        $this->assertSame('published extra', $this->onStage(Versioned::LIVE, VersionedSub::class, $sub)?->Extra);
+        $this->assertSame('draft extra', $this->onStage(Versioned::DRAFT, VersionedSub::class, $sub)?->Extra);
+        $this->assertSame('Sub', $this->onStage(Versioned::DRAFT, VersionedSub::class, $sub)?->Title, 'a value left out of @draft keeps its published value');
+        $this->assertSame(3, $this->onStage(Versioned::DRAFT, VersionedSub::class, $sub)?->Sort, 'a default is on draft too');
+    }
+
+    public function testAPublishedRecordWithDraftValuesHasTheRowsWritePublishAndWriteLeave(): void
+    {
+        $tables = [
+            'FixturesTest_VersionedRecord',
+            'FixturesTest_VersionedRecord_Live',
+            'FixturesTest_VersionedRecord_Versions',
+            'FixturesTest_VersionedSub',
+            'FixturesTest_VersionedSub_Live',
+            'FixturesTest_VersionedSub_Versions',
+        ];
+        DBDatetime::set_mock_now('2026-11-27 10:00:00');
+        $this->logOut();
+        $changed = $this->writeRecord('Published', true);
+        $changed->Title = 'Draft';
+        $changed->write();
+        $sub = VersionedSub::create();
+        $sub->update(['Title' => 'Sub', 'Extra' => 'published extra']);
+        $sub->write();
+        $sub->publishSingle();
+        $sub->Extra = 'draft extra';
+        $sub->write();
+        $written = $this->snapshot($tables, ['changed' => $changed->ID, 'sub' => $sub->ID]);
+
+        $this->assertCount(6, $written['FixturesTest_VersionedRecord_Versions'], 'write(), publish and write() left three version rows each');
+        $this->emptyTables($tables);
+
+        $loaded = FixtureLoader::singleton()->load(self::FIXTURES . 'versioned-modified.yml');
+
+        // The loader writes the published version and the draft change: they are compared with the last two of
+        // write()'s, as versions 1 and 2, draft and live rows included
+        $this->assertSame($this->latestVersions($written, 2), $this->snapshot($tables, [
+            'changed' => $loaded->idOf(VersionedRecord::class, 'changed'),
+            'sub' => $loaded->idOf(VersionedSub::class, 'sub'),
+        ]));
+    }
+
+    public function testResetRemovesEveryVersionOfARecordWithDraftValues(): void
+    {
+        FixtureLoader::singleton()->load(self::FIXTURES . 'versioned-modified.yml');
+
+        FixtureLoader::singleton()->reset();
+
+        foreach (['FixturesTest_VersionedRecord', 'FixturesTest_VersionedSub'] as $table) {
+            foreach (['', '_Live', '_Versions'] as $suffix) {
+                $this->assertSame(0, (int) DB::query(sprintf('SELECT COUNT(*) FROM "%s%s"', $table, $suffix))->value(), $table . $suffix);
+            }
+        }
+    }
+
+    public function testAnOwnerAskedBeforeALoadSeesTheDraftChangeOfARecordItOwns(): void
+    {
+        $owner = $this->writeRecord('Owner', true);
+        $this->assertFalse($owner->stagesDifferRecursive(), 'nothing it owns differs yet');
+        $path = (string) tempnam(sys_get_temp_dir(), 'fixture');
+        file_put_contents($path, sprintf(
+            "%s:\n  child:\n    Title: Child\n    ParentID: %d\n    '@published': true\n    '@draft': { Title: Child (draft) }\n",
+            VersionedRecord::class,
+            $owner->ID,
+        ));
+
+        try {
+            FixtureLoader::singleton()->load($path);
+        } finally {
+            unlink($path);
+        }
+
+        $this->assertTrue(VersionedRecord::get()->byID($owner->ID)?->stagesDifferRecursive(), 'the owned record is modified on draft');
+    }
+
     public function testACachedVersionNumberHidesNeitherALoadNorAReset(): void
     {
         // Without IDs, Versioned marks the live cache complete: an ID it does not hold reads as not on live
@@ -131,6 +223,26 @@ final class VersionedFixtureTest extends SapphireTest
         $this->expectExceptionMessage('is versioned without stages and has no published state');
 
         FixtureLoader::singleton()->load(self::FIXTURES . 'unstaged-published.yml');
+    }
+
+    public function testDraftValuesNeedAPublishedRecordOfAStagedClassAndNothingIsWritten(): void
+    {
+        try {
+            FixtureLoader::singleton()->load(self::FIXTURES . 'draft-invalid.yml');
+            $this->fail('Draft values without a published record must be refused');
+        } catch (InvalidFixtureException $exception) {
+            $where = self::FIXTURES . 'draft-invalid.yml, ';
+            $this->assertSame(
+                [
+                    $where . VersionedRecord::class . '.unpublished: "@draft" needs a published record',
+                    $where . UnstagedRecord::class . '.unstaged: "@draft": ' . UnstagedRecord::class . ' is versioned without stages and has no published state',
+                ],
+                $exception->getProblems(),
+            );
+        }
+
+        $this->assertSame(0, VersionedRecord::get()->count());
+        $this->assertSame(0, UnstagedRecord::get()->count());
     }
 
     public function testNewIdsStartAboveArchivedAndLiveOnlyRecords(): void
@@ -239,14 +351,12 @@ final class VersionedFixtureTest extends SapphireTest
         $this->emptyTables($tables);
 
         $loaded = FixtureLoader::singleton()->load(self::FIXTURES . 'versioned-published.yml');
-        [$loadedRows, $loadedVersions] = $this->latestVersionOnly($this->snapshot($tables, [
+
+        // The loader writes one version, which is published: it is compared with the latest of write()'s, as version 1
+        $this->assertSame($this->latestVersions($written, 1), $this->snapshot($tables, [
             'home' => $loaded->idOf(VersionedRecord::class, 'home'),
             'sub' => $loaded->idOf(VersionedSub::class, 'sub'),
         ]));
-
-        // The loader writes one version, which is published: it is compared with the latest of write()'s
-        $this->assertSame($this->latestVersionOnly($written)[0], $loadedRows);
-        $this->assertSame([1], $loadedVersions, 'draft, live and version rows carry the one version');
     }
 
     /**
@@ -262,6 +372,14 @@ final class VersionedFixtureTest extends SapphireTest
         $this->assertNotNull($record);
 
         return $record;
+    }
+
+    /**
+     * @param class-string<VersionedRecord> $class
+     */
+    private function onStage(string $stage, string $class, int $id): ?VersionedRecord
+    {
+        return Versioned::get_by_stage($class, $stage)->byID($id);
     }
 
     private function writeRecord(string $title, bool $publish): VersionedRecord

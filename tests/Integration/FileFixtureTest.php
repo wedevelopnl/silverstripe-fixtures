@@ -175,6 +175,33 @@ final class FileFixtureTest extends SapphireTest
         $this->assertSame(0, File::get()->count());
     }
 
+    public function testADraftValueThatWouldRenameOrMoveAFileIsRefused(): void
+    {
+        $this->requireVersioned();
+
+        try {
+            FixtureLoader::singleton()->load(self::FIXTURES . 'files-draft-invalid.yml');
+            $this->fail('A draft value that renames or moves a file must be refused');
+        } catch (InvalidFixtureException $exception) {
+            $where = self::FIXTURES . 'files-draft-invalid.yml, ';
+            $this->assertSame(
+                [
+                    $where . 'SilverStripe\Assets\Folder.fixture_files: "@draft": "Name" cannot rename or move a file',
+                    $where . 'SilverStripe\Assets\Image.logo: "@draft": "Name" cannot rename or move a file',
+                    $where . 'SilverStripe\Assets\Image.logo: "@draft": "ParentID" cannot rename or move a file',
+                    $where . 'SilverStripe\Assets\Image.logo: "@draft": "Parent" cannot hold a reference',
+                    $where . 'SilverStripe\Assets\Image.logo: "@draft": "File" cannot rename or move a file',
+                    $where . 'SilverStripe\Assets\Image.logo: "@draft": "FileFilename" cannot rename or move a file',
+                    $where . 'SilverStripe\Assets\Image.logo: "@draft": "FileHash" cannot rename or move a file',
+                    $where . 'SilverStripe\Assets\Image.logo: "@draft": "FileVariant" cannot rename or move a file',
+                ],
+                $exception->getProblems(),
+            );
+        }
+
+        $this->assertSame(0, File::get()->count());
+    }
+
     public function testResetKeepsAFileTheSiteAlreadyHad(): void
     {
         $existing = Image::create();

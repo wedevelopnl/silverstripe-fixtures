@@ -68,6 +68,24 @@ On a versioned class, `'@published': true` loads the record as published and `fa
 
 A loaded record has exactly one version: a published record is on draft and live and not modified, a draft-only record is on draft alone. Without `@published` a record is draft-only, as a plain `write()` leaves it. `@published` on a class that is not versioned, or `true` on a class versioned without stages, refuses the load.
 
+`@draft` on a published record holds the values that differ on draft, as an edit saved after publishing leaves them:
+
+```yaml
+SilverStripe\CMS\Model\SiteTree:
+  about:
+    Title: About us
+    URLSegment: about-us
+    '@published': true
+    '@draft':
+      Title: About us (draft)
+```
+
+- The record's own values are published; its draft holds them with the `@draft` values over them. A value `@draft` leaves out keeps its published value on draft.
+- The record is modified on draft, with unpublished changes, and has two versions: the published one (1) and the draft change (2). A `@draft` value equal to the published one still makes a draft change.
+- Only values of the record's own fields: a reference, a has_one or many_many, a has_many and a loader key such as `@source` refuse the load.
+- On a file or folder it cannot rename or move the file: `Name`, `ParentID` and the `File` columns refuse the load; other values, such as `Title`, are allowed.
+- It refuses the load on a record that is not published, on a class that is not versioned or is versioned without stages, together with `@locales`, and directly under a class.
+
 ### Values per language
 
 On a class Fluent translates, `@locales` maps a locale code to the record's translated values:
@@ -203,7 +221,7 @@ A named class is cleared with its subclasses, selected by `ClassName`: naming `P
 
 ## Limits
 
-- One version per record: no edit history, nothing modified after publishing, nothing unpublished after publishing.
+- At most two versions per record, the published one and one `@draft` change: no edit history beyond that, nothing unpublished after publishing, no draft change per locale.
 - Values computed by hooks are not filled in; fixtures state them.
 - `ChangeSet` and `ChangeSetItem` rows are not written; declare them as fixture records when a test needs them.
 - MySQL and MariaDB only, and only MySQL 8 is tested: the test harness and CI run MySQL 8. On MariaDB, numbering above the auto-increment counter relies on its `information_schema` reporting the counter live.

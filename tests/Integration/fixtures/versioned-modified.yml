@@ -1,0 +1,13 @@
+WeDevelop\Fixtures\Tests\Integration\Model\VersionedRecord:
+  changed:
+    Title: Published
+    '@published': true
+    '@draft':
+      Title: Draft
+WeDevelop\Fixtures\Tests\Integration\Model\VersionedSub:
+  sub:
+    Title: Sub
+    Extra: published extra
+    '@published': true
+    '@draft':
+      Extra: draft extra

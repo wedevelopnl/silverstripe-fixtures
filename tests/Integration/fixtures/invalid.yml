@@ -17,6 +17,17 @@ WeDevelop\Fixtures\Tests\Integration\Model\Plain:
     ParentID: =>WeDevelop\Fixtures\Tests\Integration\Model\Plain.broken
     Body: =>WeDevelop\Fixtures\Tests\Integration\Model\Tag.red
     '@published': true
+    '@draft':
+      Title: Draft
+      Subtitle: unknown
+      ID: 3
+      Body: =>WeDevelop\Fixtures\Tests\Integration\Model\Tag.red
+      Target: =>WeDevelop\Fixtures\Tests\Integration\Model\Tag.red
+      Tags:
+        - =>WeDevelop\Fixtures\Tests\Integration\Model\Tag.red
+      Children:
+        - =>WeDevelop\Fixtures\Tests\Integration\Model\Plain.broken
+      '@source': logo.png
   twice:
     Tags:
       - ref: =>WeDevelop\Fixtures\Tests\Integration\Model\Tag.red

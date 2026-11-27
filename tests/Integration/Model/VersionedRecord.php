@@ -19,6 +19,18 @@ class VersionedRecord extends DataObject implements TestOnly
         'Sort' => 'Int',
     ];
 
+    private static array $has_one = [
+        'Parent' => VersionedRecord::class,
+    ];
+
+    private static array $has_many = [
+        'Children' => VersionedRecord::class . '.Parent',
+    ];
+
+    private static array $owns = [
+        'Children',
+    ];
+
     private static array $defaults = [
         'Sort' => 3,
     ];

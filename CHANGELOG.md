@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-11-27
+
+### Added
+
+- `@draft` on a published versioned record: field values that differ on draft. The record loads as published and modified on draft, with the published version and the draft change as its two versions. Not allowed on a record that is not published, with `@locales`, for references and relations, or for a file's name, folder or stored file.
+
+### Fixed
+
+- A load or reset also clears Versioned's cache of whether an owner's owned records differ between stages.
+
 ## [0.1.1] - 2026-11-27
 
 ### Added
@@ -29,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `InvalidFixtureException` listing every problem of a fixture set, and `ResetRefusedException` outside the dev and test environments.
 - `task benchmark`: compares loading and clearing with the framework's fixture handling, for the whole set in one load and per file.
 
-[Unreleased]: https://github.com/wedevelopnl/silverstripe-fixtures/compare/0.1.1...HEAD
+[Unreleased]: https://github.com/wedevelopnl/silverstripe-fixtures/compare/0.1.2...HEAD
+[0.1.2]: https://github.com/wedevelopnl/silverstripe-fixtures/compare/0.1.1...0.1.2
 [0.1.1]: https://github.com/wedevelopnl/silverstripe-fixtures/compare/0.1.0...0.1.1
 [0.1.0]: https://github.com/wedevelopnl/silverstripe-fixtures/releases/tag/0.1.0
