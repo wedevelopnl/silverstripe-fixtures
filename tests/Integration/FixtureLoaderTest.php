@@ -92,6 +92,24 @@ final class FixtureLoaderTest extends SapphireTest
         $this->assertSame(0, FixtureLedger::get()->count());
     }
 
+    public function testAFileWithoutRecordsOrNoFileAtAllLoadsNothingAndSendsNoQuery(): void
+    {
+        $loader = FixtureLoader::singleton();
+        // Reading the counter is itself a statement, so an empty load adds exactly what an idle read does
+        $before = $this->questions();
+        $idle = $this->questions() - $before;
+
+        $before = $this->questions();
+        $fromEmptyFile = $loader->load(self::FIXTURES . 'empty.yml');
+        $withoutFiles = $loader->load();
+        $sent = $this->questions() - $before;
+
+        $this->assertSame([], $fromEmptyFile->toArray());
+        $this->assertSame([], $withoutFiles->toArray());
+        $this->assertSame($idle, $sent);
+        $this->assertSame(0, FixtureLedger::get()->count());
+    }
+
     public function testADatabaseErrorLeavesNothingOfTheLoad(): void
     {
         $this->tag('Site tag');
@@ -274,6 +292,14 @@ final class FixtureLoaderTest extends SapphireTest
     private function ledgerFirstId(string $table): int
     {
         return (int) FixtureLedger::get()->find('TableName', $table)?->FirstID;
+    }
+
+    /**
+     * The statements MySQL has counted for this connection.
+     */
+    private function questions(): int
+    {
+        return (int) DB::query("SHOW SESSION STATUS LIKE 'Questions'")->record()['Value'];
     }
 
     private function tag(string $title): Tag
