@@ -11,6 +11,7 @@ use SilverStripe\Core\Injector\Injectable;
 use SilverStripe\ORM\DataObject;
 use SilverStripe\ORM\Connect\Database;
 use SilverStripe\ORM\DB;
+use TractorCow\Fluent\Model\Domain;
 use TractorCow\Fluent\Model\Locale;
 use WeDevelop\Fixtures\Load\FixtureReader;
 use WeDevelop\Fixtures\Load\PathResolver;
@@ -115,8 +116,9 @@ class FixtureLoader
     {
         DataObject::singleton()->flushCache();
         if (class_exists(Locale::class)) {
-            // Fluent keeps the locales in memory; a load can add some
+            // Fluent keeps the locales and domains in memory, as FluentTestState clears them; a load can add some
             Locale::clearCached();
+            Domain::clearCached();
         }
 
         // The DataObject singleton returns before its extensions' onFlushCache, where Versioned clears its version
