@@ -148,10 +148,11 @@ tasks:
         -c "composer update --no-install --no-scripts --no-interaction && cp composer.lock /lock/{{.LOCK}}"
 
   verify-lock:
-    desc: Fail if the committed lock no longer covers the module's requirements
-    deps: [ensure-up]
+    desc: Fail if either committed lock no longer covers the module's requirements
+    deps: [ensure-up, ensure-up-modules]
     cmds:
       - "{{.EXEC}} /app/verify-lock.sh"
+      - "{{.EXEC_MODULES}} /app/verify-lock.sh"
 
   # --- Static analysis ------------------------------------------------------
   # In the optional-modules testbed: src/ uses Versioned and Fluent behind
