@@ -2,7 +2,7 @@ WeDevelop\Fixtures\Tests\Integration\Model\LocalisedRecord:
   home:
     Title: Home
     '@locales':
-      nl_NL: { Sort: 2, Unknown: x }
+      nl_NL: { Sort: 2, Unknown: x, Title: '=>WeDevelop\Fixtures\Tests\Integration\Model\Tag.red' }
 WeDevelop\Fixtures\Tests\Integration\Model\Tag:
   red:
     Title: Red

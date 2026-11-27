@@ -74,6 +74,8 @@ final class FixtureLoaderTest extends SapphireTest
                     $where . Plain::class . '.broken: "Tags" must be a list of references',
                     $where . Plain::class . '.broken: "Related" has no extra field "Weight"',
                     $where . Plain::class . '.broken: "Links" is a many_many through; declare records of its join class instead',
+                    $where . Plain::class . '.broken: "ParentID" cannot hold a reference; set the has_one instead: Parent: =>Class.identifier',
+                    $where . Plain::class . '.broken: "Body" cannot hold a reference; only a has_one or many_many takes one',
                     $where . Plain::class . '.broken: "@published": ' . Plain::class . ' has no published state',
                     $where . Tag::class . '.red: refers to ' . Plain::class . '.missing, which no file of this load holds',
                     $where . 'Unknown\Kind.thing: unknown class "Unknown\Kind"',

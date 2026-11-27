@@ -171,6 +171,7 @@ final class FluentFixtureTest extends SapphireTest
                 [
                     $where . '"Sort" is not translated (nl_NL)',
                     $where . '"Unknown" is not translated (nl_NL)',
+                    $where . '"Title" cannot hold a reference (nl_NL)',
                     self::FIXTURES . 'localised-invalid.yml, ' . Tag::class . '.red: "@locales": ' . Tag::class . ' is not translated',
                 ],
                 $exception->getProblems(),

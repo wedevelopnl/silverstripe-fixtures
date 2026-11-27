@@ -60,6 +60,8 @@ Page:
 | many_many | A list of references on the declaring side: `Tags: [=>Tag.red, =>Tag.blue]`. An item with extra fields is a map: `{ ref: =>Tag.blue, Weight: 3 }`. |
 | many_many through | Declare records of the join class, with their two has_ones. |
 
+A reference is only resolved on a has_one or many_many. A column that holds one, such as the framework's `ParentID: =>Page.home`, or a value under `@locales` refuses the load: write `Parent: =>Page.home`.
+
 ### Published and draft-only records
 
 On a versioned class, `'@published': true` loads the record as published and `false` as draft-only. Directly under the class it is the default for that class's records in that file; a record's own `@published` overrides it.
