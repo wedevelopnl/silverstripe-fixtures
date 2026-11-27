@@ -116,6 +116,8 @@ final class FixtureReader
                 $published = $this->readPublished($where, $values, $problems);
             } elseif (str_starts_with($identifier, '@')) {
                 $problems[] = sprintf('%s: unknown loader key "%s"', $where, $identifier);
+            } elseif (preg_match('/\s/', $identifier) === 1) {
+                $problems[] = sprintf('%s.%s: an identifier cannot hold whitespace, as a reference could not name it', $where, $identifier);
             } elseif ($values === null || $values === [] || (is_array($values) && !array_is_list($values))) {
                 $declared[] = [$identifier, $values ?? []];
             } else {

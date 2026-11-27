@@ -81,7 +81,7 @@ final class FixtureReaderTest extends TestCase
         );
     }
 
-    public function testARecordWhoseBodyIsNotAMapOfValuesIsReported(): void
+    public function testARecordWhoseBodyIsNotAMapOfValuesOrWhoseIdentifierHoldsWhitespaceIsReported(): void
     {
         $set = (new FixtureReader())->read(['malformed-records.yml' => self::DIR . 'malformed-records.yml']);
 
@@ -89,6 +89,7 @@ final class FixtureReaderTest extends TestCase
             [
                 'malformed-records.yml, Page.home: expected field values by name',
                 'malformed-records.yml, Page.about: expected field values by name',
+                'malformed-records.yml, Page.About us: an identifier cannot hold whitespace, as a reference could not name it',
             ],
             $set->problems,
         );
