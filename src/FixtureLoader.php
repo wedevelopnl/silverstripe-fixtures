@@ -115,6 +115,8 @@ class FixtureLoader
             Locale::clearCached();
         }
 
+        // The DataObject singleton returns before its extensions' onFlushCache, where Versioned clears its version
+        // numbers and Fluent its records per locale: only a class's own singleton reaches them
         foreach (array_unique($classes) as $class) {
             if (is_a($class, DataObject::class, true)) {
                 DataObject::singleton($class)->flushCache();

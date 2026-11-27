@@ -88,6 +88,19 @@ final class VersionedFixtureTest extends SapphireTest
             ->byID($loaded->idOf(VersionedSub::class, 'sub'))?->Extra);
     }
 
+    public function testACachedVersionNumberHidesNeitherALoadNorAReset(): void
+    {
+        // Without IDs, Versioned marks the live cache complete: an ID it does not hold reads as not on live
+        Versioned::prepopulateVersionNumberCacheForStage(VersionedRecord::class, Versioned::LIVE);
+        $id = FixtureLoader::singleton()->load(self::FIXTURES . 'versioned.yml')->idOf(VersionedRecord::class, 'home');
+
+        $this->assertSame(1, (int) Versioned::get_versionnumber_by_stage(VersionedRecord::class, Versioned::LIVE, $id), 'the load flushed the cache');
+
+        FixtureLoader::singleton()->reset();
+
+        $this->assertNull(Versioned::get_versionnumber_by_stage(VersionedRecord::class, Versioned::LIVE, $id), 'the reset flushed the cache');
+    }
+
     public function testADraftOnlyRecordIsNotPublished(): void
     {
         $loaded = FixtureLoader::singleton()->load(self::FIXTURES . 'versioned.yml');

@@ -146,6 +146,23 @@ final class FluentFixtureTest extends SapphireTest
         $this->assertSame(['en_US', 'nl_NL', 'de_DE'], Locale::getCached()->column('Locale'));
     }
 
+    public function testACachedLocaleListHidesNeitherALoadNorAReset(): void
+    {
+        $this->requireFluent();
+        FixtureLoader::singleton()->load(self::FIXTURES . 'locales.yml');
+        // Fluent marks the locale's lists complete: a record it does not hold reads as not in that locale
+        FluentVersionedExtension::prepoulateIdsInLocale('nl_NL', LocalisedRecord::class);
+        $loaded = FixtureLoader::singleton()->load(self::FIXTURES . 'localised.yml');
+        $home = LocalisedRecord::get()->byID($loaded->idOf(LocalisedRecord::class, 'home'));
+        $this->assertNotNull($home);
+
+        $this->assertTrue($home->isPublishedInLocale('nl_NL'), 'the load flushed the cache');
+
+        FixtureLoader::singleton()->reset();
+
+        $this->assertFalse($home->isPublishedInLocale('nl_NL'), 'the reset flushed the cache');
+    }
+
     public function testResetRemovesTheLocalisedRows(): void
     {
         $this->loadLocalised();
