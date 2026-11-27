@@ -55,7 +55,7 @@ final class CompatibilityTest extends SapphireTest
         $this->reserveIdRanges();
 
         $loaded = FixtureLoader::singleton()->load(
-            'wedevelopnl/silverstripe-fixtures:tests/Integration/fixtures/compatibility.yml',
+            __DIR__ . '/fixtures/compatibility.yml',
         );
         $ids = [];
         foreach ($loaded->toArray() as $identifiers) {

@@ -10,4 +10,4 @@ Page:
 SilverStripe\Assets\Image:
   logo:
     Name: logo.png
-    '@source': 'wedevelopnl/silverstripe-fixtures:tests/files/logo.png'
+    '@source': '../../files/logo.png'

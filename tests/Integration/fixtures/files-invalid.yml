@@ -18,9 +18,9 @@ SilverStripe\Assets\File:
   missing:
     Name: missing.txt
     Parent: =>SilverStripe\Assets\Folder.uploads
-    '@source': 'wedevelopnl/silverstripe-fixtures:tests/files/missing.txt'
+    '@source': '../../files/missing.txt'
   nameless:
-    '@source': 'wedevelopnl/silverstripe-fixtures:tests/files/notes.txt'
+    '@source': '../../files/notes.txt'
   readme:
     Name: readme.txt
     Parent: =>SilverStripe\Assets\Folder.uploads
@@ -30,8 +30,8 @@ SilverStripe\Assets\File:
   in_a_loop:
     Name: logo.png
     Parent: =>SilverStripe\Assets\Folder.loop_a
-    '@source': 'wedevelopnl/silverstripe-fixtures:tests/files/logo.png'
+    '@source': '../../files/logo.png'
 WeDevelop\Fixtures\Tests\Integration\Model\Tag:
   red:
     Title: Red
-    '@source': 'wedevelopnl/silverstripe-fixtures:tests/files/notes.txt'
+    '@source': '../../files/notes.txt'

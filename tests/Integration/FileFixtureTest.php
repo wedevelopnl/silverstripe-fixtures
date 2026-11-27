@@ -25,7 +25,7 @@ final class FileFixtureTest extends SapphireTest
 {
     use RowSnapshot;
 
-    private const string FIXTURES = 'wedevelopnl/silverstripe-fixtures:tests/Integration/fixtures/';
+    private const string FIXTURES = __DIR__ . '/fixtures/';
 
     protected $usesDatabase = true;
 
@@ -163,7 +163,7 @@ final class FileFixtureTest extends SapphireTest
                     $where . 'SilverStripe\Assets\Folder.own_parent: "Parent" leads back to the record itself: SilverStripe\Assets\Folder.own_parent => SilverStripe\Assets\Folder.own_parent',
                     $where . 'SilverStripe\Assets\Folder.loop_a: "Parent" leads back to the record itself: SilverStripe\Assets\Folder.loop_a => SilverStripe\Assets\Folder.loop_b => SilverStripe\Assets\Folder.loop_a',
                     $where . 'SilverStripe\Assets\Folder.loop_b: "Parent" leads back to the record itself: SilverStripe\Assets\Folder.loop_b => SilverStripe\Assets\Folder.loop_a => SilverStripe\Assets\Folder.loop_b',
-                    $where . 'SilverStripe\Assets\File.missing: "@source": no file at wedevelopnl/silverstripe-fixtures:tests/files/missing.txt',
+                    $where . 'SilverStripe\Assets\File.missing: "@source": no file at ' . self::FIXTURES . '../../files/missing.txt',
                     $where . 'SilverStripe\Assets\File.nameless: "Name" is required for a file with "@source"',
                     $where . 'SilverStripe\Assets\File.readme_copy: "readme.txt" is also the name of SilverStripe\Assets\File.readme in the same folder',
                     $where . Tag::class . '.red: "@source": ' . Tag::class . ' is not a file class',

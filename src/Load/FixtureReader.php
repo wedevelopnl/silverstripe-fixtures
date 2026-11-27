@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace WeDevelop\Fixtures\Load;
 
+use SilverStripe\Control\Director;
 use Symfony\Component\Yaml\Exception\ParseException;
 use Symfony\Component\Yaml\Yaml;
 
@@ -77,7 +78,7 @@ final class FixtureReader
 
         $records = [];
         foreach ($data as $class => $body) {
-            $records = [...$records, ...$this->readClass($label, (string) $class, $body, $problems)];
+            $records = [...$records, ...$this->readClass($label, $path, (string) $class, $body, $problems)];
         }
 
         return $records;
@@ -98,7 +99,7 @@ final class FixtureReader
      *
      * @return list<FixtureRecord>
      */
-    private function readClass(string $label, string $class, mixed $body, array &$problems): array
+    private function readClass(string $label, string $path, string $class, mixed $body, array &$problems): array
     {
         $where = $label . ', ' . $class;
         if (!is_array($body)) {
@@ -127,7 +128,7 @@ final class FixtureReader
 
         $records = [];
         foreach ($declared as [$identifier, $values]) {
-            $records[] = $this->readRecord($label, $class, $identifier, $values, $published, $problems);
+            $records[] = $this->readRecord($label, $path, $class, $identifier, $values, $published, $problems);
         }
 
         return $records;
@@ -139,6 +140,7 @@ final class FixtureReader
      */
     private function readRecord(
         string $label,
+        string $path,
         string $class,
         string $identifier,
         array $values,
@@ -156,7 +158,7 @@ final class FixtureReader
             } elseif ($key === self::LOCALES) {
                 $locales = $this->readLocales($where, $value, $problems);
             } elseif ($key === self::SOURCE) {
-                $source = $this->readSource($where, $value, $problems);
+                $source = $this->readSource($where, $value, dirname($path), $problems);
             } elseif (str_starts_with($key, '@')) {
                 $problems[] = sprintf('%s: unknown loader key "%s"', $where, $key);
             } else {
@@ -206,12 +208,17 @@ final class FixtureReader
     }
 
     /**
+     * A relative source is relative to the fixture file, so a module's fixtures name its files wherever it is
+     * installed.
+     *
      * @param list<string> $problems
+     *
+     * @return ?string the absolute path
      */
-    private function readSource(string $where, mixed $value, array &$problems): ?string
+    private function readSource(string $where, mixed $value, string $directory, array &$problems): ?string
     {
         if (is_string($value) && $value !== '') {
-            return $value;
+            return Director::is_absolute($value) ? $value : $directory . '/' . $value;
         }
 
         $problems[] = sprintf('%s: "%s" must be a path', $where, self::SOURCE);

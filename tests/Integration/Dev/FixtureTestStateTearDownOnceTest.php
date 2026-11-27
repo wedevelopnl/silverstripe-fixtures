@@ -13,7 +13,7 @@ use WeDevelop\Fixtures\Tests\Integration\Model\Tag;
 
 final class FixtureTestStateTearDownOnceTest extends SapphireTest
 {
-    private const string FIXTURES = 'wedevelopnl/silverstripe-fixtures:tests/Integration/fixtures/';
+    private const string FIXTURES = __DIR__ . '/../fixtures/';
 
     protected $usesDatabase = true;
 

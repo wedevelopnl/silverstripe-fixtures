@@ -4,4 +4,4 @@ SilverStripe\Assets\File:
     Name: notes.txt
     Title: Notes
     ParentID: 900
-    '@source': 'wedevelopnl/silverstripe-fixtures:tests/files/notes.txt'
+    '@source': '../../files/notes.txt'

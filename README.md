@@ -106,7 +106,7 @@ SilverStripe\Assets\Image:
     Name: logo.png
     Title: Logo
     Parent: =>SilverStripe\Assets\Folder.fixture_files
-    '@source': 'app/tests/files/logo.png'
+    '@source': '../files/logo.png'
     '@published': true
 ```
 
@@ -117,7 +117,9 @@ SilverStripe\Assets\Image:
 
 ### Paths
 
-Name fixture files and sources as a module resource (`vendor/module:path/to/file.yml`), as an absolute path, or relative to the project root.
+- Fixture files: an absolute path or one relative to the project root, as the framework's `YamlFixture` takes them. In a `SapphireTest`, `$fixture_file` may also be relative to the test class, as the framework resolves it before the loader sees it.
+- `@source`: an absolute path or one relative to the directory of the fixture file that declares it. A module's fixtures therefore name its own files wherever the module is installed.
+- A module resource (`vendor/module:path`) is not a path the loader takes: a project's tests load their own fixtures, not another module's.
 
 ## Using it in SapphireTest
 

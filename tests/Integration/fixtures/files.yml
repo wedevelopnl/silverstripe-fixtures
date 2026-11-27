@@ -7,7 +7,7 @@ SilverStripe\Assets\Image:
     Name: logo.png
     Title: Logo
     Parent: =>SilverStripe\Assets\Folder.fixture_files
-    '@source': 'wedevelopnl/silverstripe-fixtures:tests/files/logo.png'
+    '@source': '../../files/logo.png'
 WeDevelop\Fixtures\Tests\Integration\Model\Card:
   card:
     Title: Card

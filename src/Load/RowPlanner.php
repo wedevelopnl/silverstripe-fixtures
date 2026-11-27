@@ -144,7 +144,7 @@ final readonly class RowPlanner
 
             $schema = $schemas[$record->key()];
             $placed = FilePlacer::place(
-                (string) PathResolver::resolve($record->source),
+                $record->source,
                 $this->filename($record, $byKey),
                 // Without stages a file is as public as its record, as AssetControlExtension has it
                 $record->published === true || !$schema->staged,
