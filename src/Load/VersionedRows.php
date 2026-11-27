@@ -17,7 +17,7 @@ final class VersionedRows
     /**
      * @param array<string, array<string, mixed>> $draftRows by table, each with the record's ID
      */
-    public function add(Plan $plan, ClassSchema $schema, array $draftRows, bool $published): void
+    public static function add(Plan $plan, ClassSchema $schema, array $draftRows, bool $published): void
     {
         $draftRows[$schema->baseTable]['Version'] = self::VERSION;
         // Without stages, write() counts every version as written to both stages

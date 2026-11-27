@@ -17,7 +17,7 @@ final class LocalisedRows
     /**
      * @param array<string, array<string, mixed>> $draftRows by table, each with the record's ID
      */
-    public function add(Plan $plan, ClassSchema $schema, FixtureRecord $record, array $draftRows): void
+    public static function add(Plan $plan, ClassSchema $schema, FixtureRecord $record, array $draftRows): void
     {
         $id = $plan->idOf($record->key());
         foreach ($record->locales as $locale => $values) {
@@ -34,7 +34,7 @@ final class LocalisedRows
                     continue;
                 }
 
-                $this->addRow($plan, $schema, $table . self::SUFFIX, ['RecordID' => $id, 'Locale' => $locale, ...$row], $record->published === true);
+                self::addRow($plan, $schema, $table . self::SUFFIX, ['RecordID' => $id, 'Locale' => $locale, ...$row], $record->published === true);
             }
         }
     }
@@ -42,7 +42,7 @@ final class LocalisedRows
     /**
      * @param array<string, mixed> $row
      */
-    private function addRow(Plan $plan, ClassSchema $schema, string $table, array $row, bool $published): void
+    private static function addRow(Plan $plan, ClassSchema $schema, string $table, array $row, bool $published): void
     {
         $plan->add($table, $row);
         // A versioned class carries FluentVersionedExtension, which keeps stage and version tables per locale

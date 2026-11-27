@@ -95,8 +95,7 @@ final readonly class ClassSchema
             $schema->belongsToComponent($this->class, $key) !== null => FieldKind::HasMany,
             $this->isManyManyThrough($schema, $key) => FieldKind::ManyManyThrough,
             $schema->manyManyComponent($this->class, $key) !== null => FieldKind::ManyMany,
-            isset($this->columnTables[$key]) => FieldKind::Column,
-            isset($this->specs[$key]) => FieldKind::Composite,
+            isset($this->columnTables[$key]), isset($this->specs[$key]) => FieldKind::Value,
             default => FieldKind::Unknown,
         };
     }

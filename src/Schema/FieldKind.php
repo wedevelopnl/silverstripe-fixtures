@@ -9,8 +9,10 @@ namespace WeDevelop\Fixtures\Schema;
  */
 enum FieldKind
 {
-    case Column;
-    case Composite;
+    /**
+     * A database column or a composite field: a value write() converts with its field type.
+     */
+    case Value;
     case HasOne;
     case ManyMany;
     case ManyManyThrough;

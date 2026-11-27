@@ -15,7 +15,7 @@ final class FilePlacer
     /**
      * @return array{Hash: string, Filename: string, Variant: ?string} the file's place, for the record's File field
      */
-    public function place(string $source, string $filename, bool $public): array
+    public static function place(string $source, string $filename, bool $public): array
     {
         $store = Injector::inst()->get(AssetStore::class);
 
