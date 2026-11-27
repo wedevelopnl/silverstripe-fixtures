@@ -31,6 +31,7 @@ final class LedgerResetTest extends TestCase
         $reset->addLedgerEntry('Page', true, 1, 5);
         $reset->addLedgerEntry('Page', true, 9, 9);
         $reset->addLedgerEntry('Page_Tags', false, 3, 4);
+        $reset->addIds('Tag', []);
 
         $this->assertSame(
             ['Page' => [['SELECT DISTINCT "ClassName" FROM "Page" WHERE ("ID" BETWEEN ? AND ? OR "ID" BETWEEN ? AND ?)', [1, 5, 9, 9]], ['SELECT DISTINCT "ClassName" FROM "Page_Live" WHERE ("ID" BETWEEN ? AND ? OR "ID" BETWEEN ? AND ?)', [1, 5, 9, 9]], ['SELECT DISTINCT "ClassName" FROM "Page_Versions" WHERE ("RecordID" BETWEEN ? AND ? OR "RecordID" BETWEEN ? AND ?)', [1, 5, 9, 9]]]],

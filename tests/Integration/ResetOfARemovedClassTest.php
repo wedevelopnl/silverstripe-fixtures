@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace WeDevelop\Fixtures\Tests\Integration;
 
+use PHPUnit\Framework\Attributes\CoversClass;
 use SilverStripe\Dev\SapphireTest;
 use SilverStripe\ORM\DB;
 use WeDevelop\Fixtures\FixtureLedger;
 use WeDevelop\Fixtures\FixtureLoader;
+use WeDevelop\Fixtures\Reset\DatabaseReset;
 use WeDevelop\Fixtures\Tests\Integration\Model\Tag;
 
+#[CoversClass(DatabaseReset::class)]
 final class ResetOfARemovedClassTest extends SapphireTest
 {
     private const string FIXTURES = __DIR__ . '/fixtures/';

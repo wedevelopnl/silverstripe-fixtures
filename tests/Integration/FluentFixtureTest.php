@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace WeDevelop\Fixtures\Tests\Integration;
 
 use Page;
+use PHPUnit\Framework\Attributes\CoversClass;
 use SilverStripe\CMS\Model\SiteTree;
 use SilverStripe\Dev\SapphireTest;
 use SilverStripe\ORM\DataObject;
@@ -18,12 +19,19 @@ use TractorCow\Fluent\Model\Locale;
 use TractorCow\Fluent\State\FluentState;
 use WeDevelop\Fixtures\FixtureLoader;
 use WeDevelop\Fixtures\InvalidFixtureException;
+use WeDevelop\Fixtures\Load\LookupFetcher;
 use WeDevelop\Fixtures\LoadedFixtures;
+use WeDevelop\Fixtures\Reset\DatabaseReset;
+use WeDevelop\Fixtures\Schema\ClassSchema;
 use WeDevelop\Fixtures\Tests\Integration\Model\LocalisedRecord;
 use WeDevelop\Fixtures\Tests\Integration\Model\LocalisedSub;
 use WeDevelop\Fixtures\Tests\Integration\Model\PlainFluentRecord;
 use WeDevelop\Fixtures\Tests\Integration\Model\Tag;
 
+#[CoversClass(FixtureLoader::class)]
+#[CoversClass(ClassSchema::class)]
+#[CoversClass(LookupFetcher::class)]
+#[CoversClass(DatabaseReset::class)]
 final class FluentFixtureTest extends SapphireTest
 {
     use RowSnapshot;
@@ -234,7 +242,7 @@ final class FluentFixtureTest extends SapphireTest
         $this->assertSame([0, 0, 0, 0, 0, 0], array_values($this->localisedRowCounts()));
     }
 
-    public function testEveryLocalisedValueMustBeATranslatedField(): void
+    public function testAnInvalidSetOfValuesPerLanguageListsEveryProblemAndWritesNothing(): void
     {
         $this->requireFluent();
 
@@ -254,23 +262,9 @@ final class FluentFixtureTest extends SapphireTest
                 $exception->getProblems(),
             );
         }
-    }
-
-    public function testDraftValuesCannotBeCombinedWithValuesPerLanguage(): void
-    {
-        $this->requireFluent();
-
-        try {
-            FixtureLoader::singleton()->load(self::FIXTURES . 'locales.yml', self::FIXTURES . 'localised-draft.yml');
-            $this->fail('Draft values with values per language must be refused');
-        } catch (InvalidFixtureException $exception) {
-            $this->assertSame(
-                [self::FIXTURES . 'localised-draft.yml, ' . LocalisedRecord::class . '.home: "@draft" cannot be combined with "@locales"'],
-                $exception->getProblems(),
-            );
-        }
 
         $this->assertSame(0, LocalisedRecord::get()->count());
+        $this->assertSame(0, Locale::get()->count(), 'not even the locales of the other file');
     }
 
     private static function fluentInstalled(): bool

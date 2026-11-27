@@ -4,10 +4,15 @@ declare(strict_types=1);
 
 namespace WeDevelop\Fixtures\Tests\Unit\Load;
 
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use WeDevelop\Fixtures\Load\FixtureReader;
 use WeDevelop\Fixtures\Load\FixtureRecord;
+use WeDevelop\Fixtures\Load\FixtureSet;
 
+#[CoversClass(FixtureReader::class)]
+#[CoversClass(FixtureRecord::class)]
+#[CoversClass(FixtureSet::class)]
 final class FixtureReaderTest extends TestCase
 {
     private const string DIR = __DIR__ . '/../fixtures/';

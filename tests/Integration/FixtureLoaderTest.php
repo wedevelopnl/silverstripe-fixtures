@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace WeDevelop\Fixtures\Tests\Integration;
 
+use PHPUnit\Framework\Attributes\CoversClass;
 use SilverStripe\Control\Director;
 use SilverStripe\Core\Config\Config;
 use SilverStripe\Core\Injector\Injector;
@@ -14,13 +15,31 @@ use SilverStripe\ORM\DB;
 use WeDevelop\Fixtures\FixtureLedger;
 use WeDevelop\Fixtures\FixtureLoader;
 use WeDevelop\Fixtures\InvalidFixtureException;
+use WeDevelop\Fixtures\Load\LoadPlanner;
+use WeDevelop\Fixtures\Load\LookupFetcher;
+use WeDevelop\Fixtures\Load\RowWriter;
+use WeDevelop\Fixtures\Reset\DatabaseReset;
 use WeDevelop\Fixtures\ResetRefusedException;
+use WeDevelop\Fixtures\Schema\ClassSchema;
+use WeDevelop\Fixtures\Schema\SchemaMap;
+use WeDevelop\Fixtures\Schema\ValueConverter;
 use WeDevelop\Fixtures\Tests\Integration\Model\Plain;
 use WeDevelop\Fixtures\Tests\Integration\Model\PlainLink;
 use WeDevelop\Fixtures\Tests\Integration\Model\Sub;
 use WeDevelop\Fixtures\Tests\Integration\Model\SubWithoutTable;
 use WeDevelop\Fixtures\Tests\Integration\Model\Tag;
 
+#[CoversClass(FixtureLoader::class)]
+#[CoversClass(SchemaMap::class)]
+#[CoversClass(ClassSchema::class)]
+#[CoversClass(LookupFetcher::class)]
+#[CoversClass(LoadPlanner::class)]
+#[CoversClass(ValueConverter::class)]
+#[CoversClass(RowWriter::class)]
+#[CoversClass(DatabaseReset::class)]
+#[CoversClass(FixtureLedger::class)]
+#[CoversClass(InvalidFixtureException::class)]
+#[CoversClass(ResetRefusedException::class)]
 final class FixtureLoaderTest extends SapphireTest
 {
     private const string FIXTURES = __DIR__ . '/fixtures/';

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace WeDevelop\Fixtures\Tests\Integration;
 
+use PHPUnit\Framework\Attributes\CoversClass;
 use SilverStripe\Core\Config\Config;
 use SilverStripe\Dev\SapphireTest;
 use SilverStripe\ORM\DataObject;
@@ -12,11 +13,18 @@ use SilverStripe\ORM\FieldType\DBDatetime;
 use SilverStripe\Versioned\Versioned;
 use WeDevelop\Fixtures\FixtureLoader;
 use WeDevelop\Fixtures\InvalidFixtureException;
+use WeDevelop\Fixtures\Load\LoadPlanner;
 use WeDevelop\Fixtures\LoadedFixtures;
+use WeDevelop\Fixtures\Reset\DatabaseReset;
+use WeDevelop\Fixtures\Schema\ClassSchema;
 use WeDevelop\Fixtures\Tests\Integration\Model\UnstagedRecord;
 use WeDevelop\Fixtures\Tests\Integration\Model\VersionedRecord;
 use WeDevelop\Fixtures\Tests\Integration\Model\VersionedSub;
 
+#[CoversClass(FixtureLoader::class)]
+#[CoversClass(ClassSchema::class)]
+#[CoversClass(LoadPlanner::class)]
+#[CoversClass(DatabaseReset::class)]
 final class VersionedFixtureTest extends SapphireTest
 {
     use RowSnapshot;

@@ -5,15 +5,19 @@ declare(strict_types=1);
 namespace WeDevelop\Fixtures\Tests\Integration;
 
 use Page;
+use PHPUnit\Framework\Attributes\CoversClass;
 use SilverStripe\CMS\Model\SiteTree;
 use SilverStripe\Core\Config\Config;
 use SilverStripe\Dev\FunctionalTest;
 use SilverStripe\Versioned\Versioned;
 use WeDevelop\Fixtures\FixtureLoader;
+use WeDevelop\Fixtures\Schema\ClassSchema;
 
 /**
  * Pages loaded by the loader as the CMS and the site see them. Needs silverstripe/cms.
  */
+#[CoversClass(FixtureLoader::class)]
+#[CoversClass(ClassSchema::class)]
 final class CmsPageTest extends FunctionalTest
 {
     private const string PAGES = __DIR__ . '/fixtures/pages.yml';

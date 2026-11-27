@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace WeDevelop\Fixtures\Tests\Integration\Dev;
 
+use PHPUnit\Framework\Attributes\CoversClass;
 use SilverStripe\Dev\SapphireTest;
 use SilverStripe\ORM\Connect\TempDatabase;
 use WeDevelop\Fixtures\Dev\FixtureTestState;
@@ -11,6 +12,7 @@ use WeDevelop\Fixtures\FixtureLedger;
 use WeDevelop\Fixtures\FixtureLoader;
 use WeDevelop\Fixtures\Tests\Integration\Model\Tag;
 
+#[CoversClass(FixtureTestState::class)]
 final class FixtureTestStateTearDownOnceTest extends SapphireTest
 {
     private const string FIXTURES = __DIR__ . '/../fixtures/';

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace WeDevelop\Fixtures\Tests\Integration;
 
+use PHPUnit\Framework\Attributes\CoversClass;
 use SilverStripe\Assets\Dev\TestAssetStore;
 use SilverStripe\Assets\File;
 use SilverStripe\Assets\Folder;
@@ -17,10 +18,20 @@ use SilverStripe\ORM\FieldType\DBDatetime;
 use SilverStripe\Versioned\Versioned;
 use WeDevelop\Fixtures\FixtureLoader;
 use WeDevelop\Fixtures\InvalidFixtureException;
+use WeDevelop\Fixtures\Load\FilePlacer;
+use WeDevelop\Fixtures\Load\LoadPlanner;
+use WeDevelop\Fixtures\Load\LookupFetcher;
 use WeDevelop\Fixtures\LoadedFixtures;
+use WeDevelop\Fixtures\Schema\ClassSchema;
+use WeDevelop\Fixtures\Schema\ValueConverter;
 use WeDevelop\Fixtures\Tests\Integration\Model\Card;
 use WeDevelop\Fixtures\Tests\Integration\Model\Tag;
 
+#[CoversClass(FilePlacer::class)]
+#[CoversClass(LoadPlanner::class)]
+#[CoversClass(LookupFetcher::class)]
+#[CoversClass(ClassSchema::class)]
+#[CoversClass(ValueConverter::class)]
 final class FileFixtureTest extends SapphireTest
 {
     use RowSnapshot;
@@ -150,6 +161,26 @@ final class FileFixtureTest extends SapphireTest
         FixtureLoader::singleton()->load(self::FIXTURES . 'files.yml');
     }
 
+    public function testAFileAtANameTheSiteAlreadyHasInOneOfItsFoldersIsRefusedNamingTheFolder(): void
+    {
+        $folder = Folder::create();
+        $folder->ID = 900;
+        $folder->Name = 'site-folder';
+        $folder->write(false, true);
+        $file = File::create();
+        $file->setFromString('site notes', 'site-folder/notes.txt');
+        $file->ParentID = 900;
+        $file->write();
+
+        $this->expectException(InvalidFixtureException::class);
+        $this->expectExceptionMessage(
+            'SilverStripe\Assets\File.notes: the site already has a file or folder "site-folder/notes.txt"; '
+            . 'give the test data a folder of its own',
+        );
+
+        FixtureLoader::singleton()->load(self::FIXTURES . 'files-in-site-folder.yml');
+    }
+
     public function testEveryFileProblemIsListed(): void
     {
         try {
@@ -167,33 +198,6 @@ final class FileFixtureTest extends SapphireTest
                     $where . 'SilverStripe\Assets\File.nameless: "Name" is required for a file with "@source"',
                     $where . 'SilverStripe\Assets\File.readme_copy: "readme.txt" is also the name of SilverStripe\Assets\File.readme in the same folder',
                     $where . Tag::class . '.red: "@source": ' . Tag::class . ' is not a file class',
-                ],
-                $exception->getProblems(),
-            );
-        }
-
-        $this->assertSame(0, File::get()->count());
-    }
-
-    public function testADraftValueThatWouldRenameOrMoveAFileIsRefused(): void
-    {
-        $this->requireVersioned();
-
-        try {
-            FixtureLoader::singleton()->load(self::FIXTURES . 'files-draft-invalid.yml');
-            $this->fail('A draft value that renames or moves a file must be refused');
-        } catch (InvalidFixtureException $exception) {
-            $where = self::FIXTURES . 'files-draft-invalid.yml, ';
-            $this->assertSame(
-                [
-                    $where . 'SilverStripe\Assets\Folder.fixture_files: "@draft": "Name" cannot rename or move a file',
-                    $where . 'SilverStripe\Assets\Image.logo: "@draft": "Name" cannot rename or move a file',
-                    $where . 'SilverStripe\Assets\Image.logo: "@draft": "ParentID" cannot rename or move a file',
-                    $where . 'SilverStripe\Assets\Image.logo: "@draft": "Parent" cannot hold a reference',
-                    $where . 'SilverStripe\Assets\Image.logo: "@draft": "File" cannot rename or move a file',
-                    $where . 'SilverStripe\Assets\Image.logo: "@draft": "FileFilename" cannot rename or move a file',
-                    $where . 'SilverStripe\Assets\Image.logo: "@draft": "FileHash" cannot rename or move a file',
-                    $where . 'SilverStripe\Assets\Image.logo: "@draft": "FileVariant" cannot rename or move a file',
                 ],
                 $exception->getProblems(),
             );

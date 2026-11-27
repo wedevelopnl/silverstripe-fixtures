@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace WeDevelop\Fixtures\Tests\Integration;
 
+use PHPUnit\Framework\Attributes\CoversClass;
 use SilverStripe\Dev\SapphireTest;
 use SilverStripe\ORM\Connect\MySQLDatabase;
 use SilverStripe\ORM\DB;
 use WeDevelop\Fixtures\FixtureLoader;
+use WeDevelop\Fixtures\Load\LoadPlanner;
 use WeDevelop\Fixtures\Tests\Integration\Model\Tag;
 
 /**
@@ -15,6 +17,7 @@ use WeDevelop\Fixtures\Tests\Integration\Model\Tag;
  * connection answers the question for that variable as such a server would, with no row. Without a test
  * transaction, since the stand-in connection does not know of one and would end it.
  */
+#[CoversClass(LoadPlanner::class)]
 final class FixtureLoaderWithoutStatisticsExpiryTest extends SapphireTest
 {
     private const string FIXTURES = __DIR__ . '/fixtures/';

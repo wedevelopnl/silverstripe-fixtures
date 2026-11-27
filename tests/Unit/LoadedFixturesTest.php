@@ -5,12 +5,16 @@ declare(strict_types=1);
 namespace WeDevelop\Fixtures\Tests\Unit;
 
 use InvalidArgumentException;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use WeDevelop\Fixtures\InvalidFixtureException;
 use WeDevelop\Fixtures\LoadedFixtures;
 use WeDevelop\Fixtures\ResetRefusedException;
 
+#[CoversClass(LoadedFixtures::class)]
+#[CoversClass(InvalidFixtureException::class)]
+#[CoversClass(ResetRefusedException::class)]
 final class LoadedFixturesTest extends TestCase
 {
     public function testItAnswersTheIdOfARecordByTheClassAsWrittenAndItsIdentifier(): void

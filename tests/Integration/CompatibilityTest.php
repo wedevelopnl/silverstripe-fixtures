@@ -4,9 +4,14 @@ declare(strict_types=1);
 
 namespace WeDevelop\Fixtures\Tests\Integration;
 
+use PHPUnit\Framework\Attributes\CoversClass;
 use SilverStripe\Dev\SapphireTest;
 use SilverStripe\ORM\FieldType\DBDatetime;
 use WeDevelop\Fixtures\FixtureLoader;
+use WeDevelop\Fixtures\Load\LoadPlanner;
+use WeDevelop\Fixtures\Load\RowWriter;
+use WeDevelop\Fixtures\Schema\ClassSchema;
+use WeDevelop\Fixtures\Schema\ValueConverter;
 use WeDevelop\Fixtures\Tests\Integration\Model\Plain;
 use WeDevelop\Fixtures\Tests\Integration\Model\PlainLink;
 use WeDevelop\Fixtures\Tests\Integration\Model\Sub;
@@ -17,6 +22,11 @@ use WeDevelop\Fixtures\Tests\Integration\Model\Tag;
  * The loader's rows must equal the rows write() leaves for the same records: the only guard that a directly
  * written row is a row the ORM would have written.
  */
+#[CoversClass(FixtureLoader::class)]
+#[CoversClass(ClassSchema::class)]
+#[CoversClass(LoadPlanner::class)]
+#[CoversClass(ValueConverter::class)]
+#[CoversClass(RowWriter::class)]
 final class CompatibilityTest extends SapphireTest
 {
     use RowSnapshot;
