@@ -12,6 +12,8 @@ use SilverStripe\Assets\Storage\AssetStore;
 use SilverStripe\Core\Config\Config;
 use SilverStripe\Core\Injector\Injector;
 use SilverStripe\Dev\SapphireTest;
+use SilverStripe\ORM\DB;
+use SilverStripe\ORM\FieldType\DBDatetime;
 use SilverStripe\Versioned\Versioned;
 use WeDevelop\Fixtures\FixtureLoader;
 use WeDevelop\Fixtures\InvalidFixtureException;
@@ -21,6 +23,8 @@ use WeDevelop\Fixtures\Tests\Integration\Model\Tag;
 
 final class FileFixtureTest extends SapphireTest
 {
+    use RowSnapshot;
+
     private const string FIXTURES = 'wedevelopnl/silverstripe-fixtures:tests/Integration/fixtures/';
 
     protected $usesDatabase = true;
@@ -55,6 +59,32 @@ final class FileFixtureTest extends SapphireTest
         $this->assertSame(['fixture-files'], Folder::get()->column('Name'), 'the files section lists the folder');
         $this->assertSame(['logo.png'], File::get()->filter('ParentID', $image->ParentID)->column('Name'));
         $this->assertNotEmpty($image->getURL());
+    }
+
+    public function testALoadedFileHasTheRowsWriteAndSetFromLocalFileLeave(): void
+    {
+        $tables = array_values(array_filter(['File', 'File_Live', 'File_Versions'], DB::get_schema()->hasTable(...)));
+        DBDatetime::set_mock_now('2026-11-27 10:00:00');
+        $this->logOut();
+        $folder = Folder::create();
+        $folder->Name = 'fixture-files';
+        $folder->Title = 'fixture-files';
+        $folder->write();
+        $image = Image::create();
+        $image->setFromLocalFile(__DIR__ . '/../files/logo.png', 'fixture-files/logo.png');
+        $image->Title = 'Logo';
+        $image->ParentID = $folder->ID;
+        $image->write();
+        $written = $this->snapshot($tables, ['fixture_files' => $folder->ID, 'logo' => $image->ID]);
+        $this->assertContains(sha1_file(__DIR__ . '/../files/logo.png'), array_column($written['File'], 'FileHash'), 'the compared rows hold the file columns');
+        $this->emptyTables($tables);
+
+        $loaded = FixtureLoader::singleton()->load(self::FIXTURES . 'files.yml');
+
+        $this->assertSame($written, $this->snapshot($tables, [
+            'fixture_files' => $loaded->idOf(Folder::class, 'fixture_files'),
+            'logo' => $loaded->idOf(Image::class, 'logo'),
+        ]));
     }
 
     public function testAFileInAFolderGivenByIdIsPlacedInThatFolder(): void
