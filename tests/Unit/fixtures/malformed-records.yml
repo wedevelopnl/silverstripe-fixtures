@@ -1,5 +1,7 @@
 Page:
   home: Home page
   about: [a, b]
+  'About us':
+    Title: About us
   contact:
     Title: Contact
