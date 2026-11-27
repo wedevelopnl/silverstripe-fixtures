@@ -189,7 +189,7 @@ final class VersionedFixtureTest extends SapphireTest
             $this->snapshot($staged, ['draft' => $draft->ID, 'sub' => $sub->ID]),
             $this->snapshot($unstaged, ['unstaged' => $unstagedRecord->ID]),
         ];
-        $this->assertNotContains([], $written[0]['FixturesTest_VersionedRecord_Versions']);
+        $this->assertCount(2, $written[0]['FixturesTest_VersionedRecord_Versions'], 'write() left a version row each for draft and sub');
         $this->emptyTables([...$staged, ...$unstaged]);
 
         $loaded = FixtureLoader::singleton()->load(self::FIXTURES . 'versioned-draft.yml');

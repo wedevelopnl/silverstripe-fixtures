@@ -149,13 +149,22 @@ final class FluentFixtureTest extends SapphireTest
     public function testResetRemovesTheLocalisedRows(): void
     {
         $this->loadLocalised();
+        $this->assertSame(
+            [
+                'FixturesTest_LocalisedRecord_Localised' => 5,
+                'FixturesTest_LocalisedRecord_Localised_Live' => 4,
+                'FixturesTest_LocalisedRecord_Localised_Versions' => 5,
+                'FixturesTest_LocalisedSub_Localised' => 2,
+                'FixturesTest_LocalisedSub_Localised_Live' => 2,
+                'FixturesTest_LocalisedSub_Localised_Versions' => 2,
+            ],
+            $this->localisedRowCounts(),
+            'home, draft and sub in their locales; only home and sub are published',
+        );
 
         FixtureLoader::singleton()->reset();
 
-        foreach (['', '_Live', '_Versions'] as $suffix) {
-            $table = 'FixturesTest_LocalisedRecord_Localised' . $suffix;
-            $this->assertSame(0, (int) DB::query(sprintf('SELECT COUNT(*) FROM "%s"', $table))->value(), $table);
-        }
+        $this->assertSame([0, 0, 0, 0, 0, 0], array_values($this->localisedRowCounts()));
     }
 
     public function testEveryLocalisedValueMustBeATranslatedField(): void
@@ -189,6 +198,22 @@ final class FluentFixtureTest extends SapphireTest
         if (!self::fluentInstalled()) {
             $this->markTestSkipped('tractorcow/silverstripe-fluent is not installed');
         }
+    }
+
+    /**
+     * @return array<string, int> row count by localised table of LocalisedRecord and LocalisedSub
+     */
+    private function localisedRowCounts(): array
+    {
+        $counts = [];
+        foreach (['FixturesTest_LocalisedRecord', 'FixturesTest_LocalisedSub'] as $table) {
+            foreach (['', '_Live', '_Versions'] as $suffix) {
+                $localised = $table . '_Localised' . $suffix;
+                $counts[$localised] = (int) DB::query(sprintf('SELECT COUNT(*) FROM "%s"', $localised))->value();
+            }
+        }
+
+        return $counts;
     }
 
     private function loadLocalised(): LoadedFixtures

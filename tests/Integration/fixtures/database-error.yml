@@ -1,3 +1,7 @@
+# Plain is inserted first and succeeds; the Tag insert after it fails on the unique Code
+WeDevelop\Fixtures\Tests\Integration\Model\Plain:
+  written:
+    Title: Written before the failing insert
 WeDevelop\Fixtures\Tests\Integration\Model\Tag:
   first:
     Title: First

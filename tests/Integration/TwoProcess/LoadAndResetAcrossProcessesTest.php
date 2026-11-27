@@ -29,6 +29,8 @@ final class LoadAndResetAcrossProcessesTest extends TestCase
     protected function tearDown(): void
     {
         unlink('/app/public/' . $this->endpoint);
+        // The reset under test may not have run: never leave the load in the harness's database
+        $this->cli('reset');
     }
 
     public function testRecordsLoadedByOneProcessAreRemovedByAResetOverHttp(): void
@@ -49,7 +51,7 @@ final class LoadAndResetAcrossProcessesTest extends TestCase
         $this->assertSame('0', $this->cli('count', implode(',', $ids)));
     }
 
-    private function cli(string $command, string $argument): string
+    private function cli(string $command, string $argument = ''): string
     {
         $process = proc_open(
             ['php', self::SCRIPTS . 'cli.php', $command, $argument],
