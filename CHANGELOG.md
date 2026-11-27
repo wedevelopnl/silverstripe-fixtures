@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-11-27
+
+### Added
+
+- `--dir` on the `fixtures` task (`dir[]` at `/dev/tasks/fixtures`): loads or resets every `.yml` and `.yaml` file directly in a directory, together with the `--file` files. A missing directory, or one without such a file, fails the task before anything is cleared or written.
+
 ## [0.1.0] - 2026-11-27
 
 ### Added
@@ -23,5 +29,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `InvalidFixtureException` listing every problem of a fixture set, and `ResetRefusedException` outside the dev and test environments.
 - `task benchmark`: compares loading and clearing with the framework's fixture handling, for the whole set in one load and per file.
 
-[Unreleased]: https://github.com/wedevelopnl/silverstripe-fixtures/compare/0.1.0...HEAD
+[Unreleased]: https://github.com/wedevelopnl/silverstripe-fixtures/compare/0.1.1...HEAD
+[0.1.1]: https://github.com/wedevelopnl/silverstripe-fixtures/compare/0.1.0...0.1.1
 [0.1.0]: https://github.com/wedevelopnl/silverstripe-fixtures/releases/tag/0.1.0

@@ -1,0 +1,1 @@
+Not a fixture: a directory load skips every file without a .yml or .yaml extension
