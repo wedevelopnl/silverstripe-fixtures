@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace WeDevelop\Fixtures\Tests\Unit\Load;
 
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use WeDevelop\Fixtures\Load\FixtureRecord;
 use WeDevelop\Fixtures\Load\LocalisedRows;
@@ -48,27 +49,41 @@ final class LocalisedRowsTest extends TestCase
         $this->assertSame(['Page_Localised' => [$page, $page], 'Page_Sub_Localised' => [$sub, $sub]], $plan->conversions());
     }
 
-    public function testLocalisedStagesHaveAVersionAndALiveRowWhenPublished(): void
+    /**
+     * @return iterable<string, array{bool, array<string, list<array<string, mixed>>>, array<string, mixed>}>
+     */
+    public static function publication(): iterable
+    {
+        $row = ['RecordID' => 3, 'Locale' => 'nl_NL', 'ID' => 3, 'Title' => 'Thuis'];
+        $columns = ['RecordID' => true, 'Locale' => true, 'Title' => true];
+        $stage = [0 => [['Title' => 'Varchar'], $columns]];
+        $version = [0 => [['Title' => 'Varchar'], [...$columns, 'Version' => true]]];
+        yield 'published' => [
+            true,
+            ['Page_Localised' => [$row], 'Page_Localised_Versions' => [[...$row, 'Version' => 1]], 'Page_Localised_Live' => [$row]],
+            ['Page_Localised' => $stage, 'Page_Localised_Versions' => $version, 'Page_Localised_Live' => $stage],
+        ];
+        yield 'unpublished' => [
+            false,
+            ['Page_Localised' => [$row], 'Page_Localised_Versions' => [[...$row, 'Version' => 1]]],
+            ['Page_Localised' => $stage, 'Page_Localised_Versions' => $version],
+        ];
+    }
+
+    /**
+     * @param array<string, list<array<string, mixed>>> $rows
+     * @param array<string, mixed> $conversions
+     */
+    #[DataProvider('publication')]
+    public function testLocalisedStagesHaveAVersionAndALiveRowWhenPublished(bool $published, array $rows, array $conversions): void
     {
         $schema = ClassSchemas::of('App\Page', 'Page', fields: ['Title' => 'Varchar'], localisedTables: ['Page' => ['Title']], localisedStages: true);
-        $columns = ['RecordID' => true, 'Locale' => true, 'Title' => true];
-        $rows = [];
-        foreach ([true, false] as $published) {
-            $plan = new Plan([]);
-            $plan->assign('App\Page.home', 'App\Page', 3);
-            $record = new FixtureRecord('a.yml', 'App\Page', 'home', [], $published, ['nl_NL' => ['Title' => 'Thuis']], null, []);
+        $plan = new Plan([]);
+        $plan->assign('App\Page.home', 'App\Page', 3);
+        $record = new FixtureRecord('a.yml', 'App\Page', 'home', [], $published, ['nl_NL' => ['Title' => 'Thuis']], null, []);
 
-            LocalisedRows::add($plan, $schema, $record, ['Page' => [['ID' => 3], []]]);
-            $rows[] = $plan->rows();
-            $conversions = $plan->conversions();
-        }
+        LocalisedRows::add($plan, $schema, $record, ['Page' => [['ID' => 3], []]]);
 
-        $row = ['RecordID' => 3, 'Locale' => 'nl_NL', 'ID' => 3, 'Title' => 'Thuis'];
-        $this->assertSame(
-            ['Page_Localised' => [$row], 'Page_Localised_Versions' => [[...$row, 'Version' => 1]], 'Page_Localised_Live' => [$row]],
-            $rows[0],
-        );
-        $this->assertSame(['Page_Localised' => [$row], 'Page_Localised_Versions' => [[...$row, 'Version' => 1]]], $rows[1]);
-        $this->assertSame([0 => [['Title' => 'Varchar'], [...$columns, 'Version' => true]]], $conversions['Page_Localised_Versions'] ?? null);
+        $this->assertSame([$rows, $conversions], [$plan->rows(), $plan->conversions()]);
     }
 }
