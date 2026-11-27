@@ -1,0 +1,14 @@
+# PriceCurrency has a default, so write() sets it before Price whatever the order stated: Price is written over it
+WeDevelop\Fixtures\Tests\Integration\Model\PricedRecord:
+  column-after:
+    Title: Column after the composite
+    Price:
+      Amount: 10
+      Currency: EUR
+    PriceCurrency: USD
+  composite-after:
+    Title: Composite after the column
+    PriceCurrency: USD
+    Price:
+      Amount: 20
+      Currency: GBP
