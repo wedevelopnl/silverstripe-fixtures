@@ -100,6 +100,7 @@ final class FixtureLoaderTest extends SapphireTest
             $this->assertStringContainsString('Duplicate entry', $exception->getMessage(), 'database errors propagate unchanged');
         }
 
+        $this->assertSame(0, Plain::get()->count(), 'the table inserted before the failing one is rolled back');
         $this->assertSame(['Site tag'], Tag::get()->column('Title'));
         $this->assertSame(0, FixtureLedger::get()->count());
     }
@@ -166,11 +167,14 @@ final class FixtureLoaderTest extends SapphireTest
         $loaded = FixtureLoader::singleton()->load(self::FIXTURES . 'tags.yml');
 
         $connection->transactionStart();
+        FixtureLoader::singleton()->load(self::FIXTURES . 'tags.yml');
+        $this->assertSame(4, Tag::get()->count());
+        $this->assertSame(2, FixtureLedger::get()->count());
         FixtureLoader::singleton()->reset();
         $this->assertSame(0, Tag::get()->count());
         $connection->transactionRollback();
 
-        $this->assertSame(['Red', 'Blue'], Tag::get()->sort('ID')->column('Title'));
+        $this->assertSame(['Red', 'Blue'], Tag::get()->sort('ID')->column('Title'), 'only the load before the transaction stays');
         $this->assertSame(1, FixtureLedger::get()->count());
         $this->assertSame($loaded->idOf(Tag::class, 'red'), (int) FixtureLedger::get()->first()?->FirstID);
     }
