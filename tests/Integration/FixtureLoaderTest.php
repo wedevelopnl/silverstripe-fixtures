@@ -13,6 +13,7 @@ use SilverStripe\Core\Kernel;
 use SilverStripe\Dev\SapphireTest;
 use SilverStripe\ORM\Connect\DatabaseException;
 use SilverStripe\ORM\DB;
+use SilverStripe\ORM\FieldType\DBDatetime;
 use WeDevelop\Fixtures\FixtureLedger;
 use WeDevelop\Fixtures\FixtureLoader;
 use WeDevelop\Fixtures\InvalidFixtureException;
@@ -61,6 +62,25 @@ final class FixtureLoaderTest extends SapphireTest
         PlainLink::class,
         Coordinate::class,
     ];
+
+    public function testAStatedCreatedOrLastEditedThatDbDatetimeStoresAsNullTakesTheLoadsTime(): void
+    {
+        DBDatetime::set_mock_now('2026-11-27 10:00:00');
+
+        FixtureLoader::singleton()->load(self::FIXTURES . 'timestamps.yml');
+
+        $this->assertSame(
+            [
+                ['Zero', '2026-11-27 10:00:00', '2026-11-27 10:00:00'],
+                ['Empty', '2026-11-27 10:00:00', '2026-11-27 10:00:00'],
+                ['Stated', '2020-01-02 00:00:00', '2020-01-03 04:05:06'],
+            ],
+            array_map(
+                static fn (array $row): array => array_values($row),
+                iterator_to_array(DB::query('SELECT "Title", "Created", "LastEdited" FROM "FixturesTest_Tag" ORDER BY "ID"'), false),
+            ),
+        );
+    }
 
     public function testItLoadsFilesTogetherAndAnswersIdsInDeclarationOrder(): void
     {

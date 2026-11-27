@@ -75,8 +75,9 @@ class FixtureLoader
             return new LoadedFixtures([]);
         }
 
-        $plan = (new LoadPlanner($schemas))->plan($set->records);
-        $rows = (new ValueConverter())->rows($plan);
+        $converter = new ValueConverter();
+        $plan = (new LoadPlanner($schemas, $converter))->plan($set->records);
+        $rows = $converter->rows($plan);
         $this->connection()->withTransaction(static fn () => (new RowWriter())->write($rows));
         $this->flushCaches($plan->classes());
 

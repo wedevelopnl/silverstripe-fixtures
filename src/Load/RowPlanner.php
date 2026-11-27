@@ -16,6 +16,8 @@ use WeDevelop\Fixtures\Schema\FieldKind;
  */
 final readonly class RowPlanner
 {
+    private const array TIMESTAMPS = ['Created' => true, 'LastEdited' => true];
+
     /**
      * @param array<string, ClassSchema|null> $schemas by class as written, of every record
      */
@@ -109,11 +111,34 @@ final readonly class RowPlanner
     }
 
     /**
+     * The Created and LastEdited each record states or has a default for, to convert: only the converted value tells
+     * whether DBDatetime stores it as NULL, which write() replaces with the time of the write.
+     *
+     * @param list<FixtureRecord> $records validated
+     *
+     * @return array<string, array<string, array{string, mixed}>> spec and raw value by reference name and column
+     */
+    public function timestamps(array $records): array
+    {
+        $timestamps = [];
+        foreach ($records as $record) {
+            $schema = $this->schemaOf($record);
+            $stated = array_intersect_key($record->fields, self::TIMESTAMPS) + array_intersect_key($schema->defaults, self::TIMESTAMPS);
+            foreach ($stated as $column => $value) {
+                $timestamps[$record->key()][$column] = [$schema->specs[$column], $value];
+            }
+        }
+
+        return $timestamps;
+    }
+
+    /**
      * @param list<FixtureRecord> $records validated
      * @param array<string, int> $floors the highest ID each table idSources() named has handed out
      * @param array<string, mixed> $placed the File field's value of each placed file, by reference name
+     * @param array<string, array<string, mixed>> $timestamps the database value of each value timestamps() named
      */
-    public function plan(array $records, array $floors, string $now, array $placed): Plan
+    public function plan(array $records, array $floors, string $now, array $placed, array $timestamps): Plan
     {
         $plan = new Plan($floors);
         foreach ($records as $record) {
@@ -122,7 +147,8 @@ final readonly class RowPlanner
         }
 
         foreach ($records as $record) {
-            $this->planRecord($plan, $record, $this->schemaOf($record), $now, $placed[$record->key()] ?? null);
+            $key = $record->key();
+            $this->planRecord($plan, $record, $this->schemaOf($record), $now, $placed[$key] ?? null, $timestamps[$key] ?? []);
         }
 
         foreach ($plan->ranges() as $table => [$first, $last]) {
@@ -144,10 +170,13 @@ final readonly class RowPlanner
         return $this->schemas[$record->class] ?? throw new LogicException(sprintf('%s was not validated', $record->label()));
     }
 
-    private function planRecord(Plan $plan, FixtureRecord $record, ClassSchema $schema, string $now, mixed $file): void
+    /**
+     * @param array<string, mixed> $timestamps the database value of each Created and LastEdited the record states
+     */
+    private function planRecord(Plan $plan, FixtureRecord $record, ClassSchema $schema, string $now, mixed $file, array $timestamps): void
     {
         $id = $plan->idOf($record->key());
-        [$values, $specs] = $this->values($plan, $record, $schema, $now);
+        [$values, $specs] = $this->values($plan, $record, $schema, $now, $timestamps);
         if ($file !== null) {
             $values['File'] = $file;
             $specs['File'] = $schema->specs['File'];
@@ -177,10 +206,12 @@ final readonly class RowPlanner
     /**
      * Column values as write() would store them: defaults, stated values over them, then the fixed columns.
      *
+     * @param array<string, mixed> $timestamps the database value of each Created and LastEdited the record states
+     *
      * @return array{array<string, mixed>, array<string, string>} raw values by field, and the specs of those that
      *                                                         convert
      */
-    private function values(Plan $plan, FixtureRecord $record, ClassSchema $schema, string $now): array
+    private function values(Plan $plan, FixtureRecord $record, ClassSchema $schema, string $now, array $timestamps): array
     {
         $values = [];
         $specs = [];
@@ -204,12 +235,10 @@ final readonly class RowPlanner
 
         $values['ClassName'] = $schema->class;
         unset($specs['ClassName']);
-        foreach (['Created', 'LastEdited'] as $column) {
-            // A value DBDatetime stores as NULL (DBDate::parseDate()) takes the load's time
-            if (empty($values[$column]) && !is_numeric($values[$column] ?? null)) {
-                $values[$column] = $now;
-                unset($specs[$column]);
-            }
+        foreach (array_keys(self::TIMESTAMPS) as $column) {
+            // Converted already: a value DBDatetime stores as NULL takes the load's time
+            $values[$column] = $timestamps[$column] ?? $now;
+            unset($specs[$column]);
         }
 
         return [$values, $specs];

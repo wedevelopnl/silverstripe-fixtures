@@ -6,7 +6,6 @@ namespace WeDevelop\Fixtures\Tests\Unit\Load;
 
 use LogicException;
 use PHPUnit\Framework\Attributes\CoversClass;
-use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use WeDevelop\Fixtures\FixtureLedger;
 use WeDevelop\Fixtures\Load\FixtureRecord;
@@ -61,35 +60,40 @@ final class RowPlannerTest extends TestCase
         );
     }
 
-    public function testAStatedCreatedOrLastEditedIsKeptAndConverted(): void
+    public function testTheCreatedAndLastEditedARecordStatesOrHasADefaultForAreHandedOutForConversion(): void
     {
-        $plan = $this->plan([$this->record('App\Tag', 'red', ['Created' => '2020-01-01 00:00:00', 'LastEdited' => null])]);
+        $planner = new RowPlanner([
+            ...$this->schemas(),
+            'App\Dated' => ClassSchemas::of('App\Dated', 'Dated', defaults: ['Created' => '2019-01-01', 'LastEdited' => '2019-01-02']),
+        ], 'FixtureLedger');
+
+        $timestamps = $planner->timestamps([
+            $this->record('App\Tag', 'red', ['Title' => 'Red', 'Created' => '0000-00-00 00:00:00', 'LastEdited' => null]),
+            $this->record('App\Tag', 'blue', ['Title' => 'Blue']),
+            $this->record('App\Dated', 'dated', ['LastEdited' => '']),
+        ]);
+
+        $this->assertSame(
+            [
+                'App\Tag.red' => ['Created' => ['DBDatetime', '0000-00-00 00:00:00'], 'LastEdited' => ['DBDatetime', null]],
+                'App\Dated.dated' => ['LastEdited' => ['DBDatetime', ''], 'Created' => ['DBDatetime', '2019-01-01']],
+            ],
+            $timestamps,
+        );
+    }
+
+    public function testAStatedCreatedOrLastEditedTakesItsConvertedValueOrTheLoadsTimeWhenItConvertsToNull(): void
+    {
+        $plan = $this->plan(
+            [$this->record('App\Tag', 'red', ['Created' => '2020-01-01', 'LastEdited' => '0000-00-00'])],
+            timestamps: ['App\Tag.red' => ['Created' => '2020-01-01 00:00:00', 'LastEdited' => null]],
+        );
 
         $this->assertSame(
             ['ID' => 1, 'Created' => '2020-01-01 00:00:00', 'LastEdited' => self::NOW, 'ClassName' => 'App\Tag'],
             $plan->rows()['Tag'][0],
         );
-        $this->assertSame([['Created' => 'DBDatetime'], null], $plan->conversions()['Tag'][0]);
-    }
-
-    /**
-     * @return iterable<string, array{mixed, mixed}>
-     */
-    public static function emptyTimestamps(): iterable
-    {
-        yield 'an empty string' => ['', self::NOW];
-        yield 'false' => [false, self::NOW];
-        yield 'a zero timestamp, which DBDatetime stores as 1970' => [0, 0];
-        yield 'a zero timestamp as a string' => ['0', '0'];
-    }
-
-    #[DataProvider('emptyTimestamps')]
-    public function testAStatedCreatedOrLastEditedThatDbDatetimeStoresAsNullTakesTheLoadsTime(mixed $stated, mixed $planned): void
-    {
-        $plan = $this->plan([$this->record('App\Tag', 'red', ['Created' => $stated, 'LastEdited' => $stated])]);
-
-        $row = $plan->rows()['Tag'][0];
-        $this->assertSame([$planned, $planned], [$row['Created'], $row['LastEdited']]);
+        $this->assertArrayNotHasKey('Tag', $plan->conversions(), 'converted already');
     }
 
     public function testAHasOneHoldsTheReferencedIdAndAPolymorphicOneAlsoItsClass(): void
@@ -176,6 +180,7 @@ final class RowPlannerTest extends TestCase
             ['Priced' => 0],
             self::NOW,
             [],
+            [],
         )->rows();
 
         $columns = ['Price' => true, 'PriceCurrency' => true];
@@ -257,10 +262,11 @@ final class RowPlannerTest extends TestCase
      * @param list<FixtureRecord> $records
      * @param array<string, int> $floors
      * @param array<string, mixed> $placed
+     * @param array<string, array<string, mixed>> $timestamps
      */
-    private function plan(array $records, array $floors = [], array $placed = []): Plan
+    private function plan(array $records, array $floors = [], array $placed = [], array $timestamps = []): Plan
     {
-        return $this->planner()->plan($records, [...['Plain' => 10, 'Tag' => 0, 'File' => 0], ...$floors], self::NOW, $placed);
+        return $this->planner()->plan($records, [...['Plain' => 10, 'Tag' => 0, 'File' => 0], ...$floors], self::NOW, $placed, $timestamps);
     }
 
     /**

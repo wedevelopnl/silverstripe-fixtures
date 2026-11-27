@@ -10,17 +10,18 @@ use SilverStripe\ORM\DB;
 use SilverStripe\ORM\FieldType\DBDatetime;
 use WeDevelop\Fixtures\FixtureLedger;
 use WeDevelop\Fixtures\Schema\ClassSchema;
+use WeDevelop\Fixtures\Schema\ValueConverter;
 
 /**
- * Asks the database, the asset store and the clock what RowPlanner needs, in this order: the ID floors, the
- * folders, the files placed, the time.
+ * Asks the database, the field types, the asset store and the clock what RowPlanner needs, in this order: the ID
+ * floors, the folders, the stated timestamps converted, the files placed, the time.
  */
 final readonly class LoadPlanner
 {
     /**
      * @param array<string, ClassSchema|null> $schemas by class as written, of every record
      */
-    public function __construct(private array $schemas)
+    public function __construct(private array $schemas, private ValueConverter $converter)
     {
     }
 
@@ -42,12 +43,20 @@ final readonly class LoadPlanner
             }
         }
 
+        // Before the files are placed, so a value DBDatetime refuses leaves none in the store
+        $timestamps = [];
+        foreach ($planner->timestamps($records) as $key => $stated) {
+            foreach ($stated as $column => [$spec, $value]) {
+                $timestamps[$key][$column] = $this->converter->value($spec, $column, $value);
+            }
+        }
+
         $placed = [];
         foreach ($planner->placements($records, $folders) as $key => [$source, $filename, $public]) {
             $placed[$key] = FilePlacer::place($source, $filename, $public);
         }
 
-        return $planner->plan($records, $floors, DBDatetime::now()->Rfc2822(), $placed);
+        return $planner->plan($records, $floors, DBDatetime::now()->Rfc2822(), $placed, $timestamps);
     }
 
     /**

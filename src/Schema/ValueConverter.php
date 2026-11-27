@@ -38,6 +38,14 @@ final class ValueConverter
     }
 
     /**
+     * The database value of one column.
+     */
+    public function value(string $spec, string $name, mixed $value): mixed
+    {
+        return $this->columns($spec, $name, $value)[$name] ?? null;
+    }
+
+    /**
      * @param array<string, mixed> $row
      * @param array<string, string> $specs
      *
