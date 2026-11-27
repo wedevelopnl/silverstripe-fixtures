@@ -142,7 +142,7 @@ final class VersionedFixtureTest extends SapphireTest
 
         $loaded = FixtureLoader::singleton()->load(self::FIXTURES . 'versioned.yml');
 
-        $this->assertSame(max($archived->ID, $liveOnly->ID) + 1, $loaded->idOf(VersionedRecord::class, 'home'));
+        $this->assertGreaterThan(max($archived->ID, $liveOnly->ID), $loaded->idOf(VersionedRecord::class, 'home'));
     }
 
     public function testResetClearsStagesAndVersionsOfLoadedAndConfiguredRecordsOnly(): void

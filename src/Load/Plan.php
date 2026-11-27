@@ -37,13 +37,18 @@ final class Plan
     private array $classes = [];
 
     /**
-     * Claims the next ID of a table with its own ID sequence; the first claim starts above the floor.
-     *
-     * @param callable(): int $floor
+     * @param array<string, int> $floors the highest ID each table with its own ID sequence has handed out
      */
-    public function claim(string $table, callable $floor): int
+    public function __construct(private readonly array $floors)
     {
-        $id = ($this->ranges[$table][1] ?? $floor()) + 1;
+    }
+
+    /**
+     * Claims the next ID of a table with its own ID sequence; the first claim starts above its floor.
+     */
+    public function claim(string $table): int
+    {
+        $id = ($this->ranges[$table][1] ?? $this->floors[$table]) + 1;
         $this->ranges[$table] = [$this->ranges[$table][0] ?? $id, $id];
 
         return $id;

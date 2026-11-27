@@ -28,12 +28,21 @@ final readonly class RowPlanner
      */
     public function plan(array $records): Plan
     {
-        $plan = new Plan();
         $schemas = [];
+        $sources = [];
         foreach ($records as $record) {
             $schema = $this->schemaOf($record);
             $schemas[$record->key()] = $schema;
-            $plan->assign($record->key(), $schema->class, $plan->claim($schema->baseTable, fn (): int => $this->floor($this->idSources($schema))));
+            $sources[$schema->baseTable] = $this->idSources($schema);
+            foreach ($this->joinTables($record, $schema) as $table) {
+                $sources[$table] = [$table => 'ID'];
+            }
+        }
+
+        $plan = new Plan($this->floors($sources));
+        foreach ($records as $record) {
+            $schema = $schemas[$record->key()];
+            $plan->assign($record->key(), $schema->class, $plan->claim($schema->baseTable));
         }
 
         $files = $this->placeFiles($records, $schemas);
@@ -92,6 +101,23 @@ final readonly class RowPlanner
                 $this->planJoinRows($plan, $schema->class, $field, $id, $value);
             }
         }
+    }
+
+    /**
+     * @return list<string> the join tables of the record's many_many values
+     */
+    private function joinTables(FixtureRecord $record, ClassSchema $schema): array
+    {
+        $tables = [];
+        foreach ($record->fields as $field => $value) {
+            if ($schema->kind($field) === FieldKind::ManyMany && is_array($value)) {
+                /** @var array{join: string} $component validated as a many_many */
+                $component = DataObject::getSchema()->manyManyComponent($schema->class, $field);
+                $tables[] = $component['join'];
+            }
+        }
+
+        return $tables;
     }
 
     /**
@@ -216,7 +242,7 @@ final readonly class RowPlanner
             }
 
             $extras = is_array($item) ? array_diff_key($item, ['ref' => true]) : [];
-            $row = ['ID' => $plan->claim($table, fn (): int => $this->floor([$table => 'ID'])), ...$sides];
+            $row = ['ID' => $plan->claim($table), ...$sides];
             foreach ($extras as $name => $value) {
                 $row = [...$row, ...ClassSchema::convert($extraFields[$name], (string) $name, $value)];
             }
@@ -246,15 +272,57 @@ final readonly class RowPlanner
     }
 
     /**
-     * @param array<string, string> $sources ID column by table
+     * The highest ID each table has handed out, in one query: above every ID its tables hold, and below its
+     * auto-increment counter, so an ID a reset freed is never handed out again.
+     *
+     * @param array<string, array<string, string>> $sources by table with its own ID sequence: ID column by table
+     *                                                     holding its IDs
+     *
+     * @return array<string, int>
      */
-    private function floor(array $sources): int
+    private function floors(array $sources): array
     {
-        $maxima = [];
-        foreach ($sources as $table => $column) {
-            $maxima[] = sprintf('COALESCE((SELECT MAX("%s") FROM "%s"), 0)', $column, $table);
+        $columns = [];
+        $parameters = [];
+        foreach ($sources as $table => $tables) {
+            $maxima = ['COALESCE((SELECT "AUTO_INCREMENT" - 1 FROM "information_schema"."TABLES" WHERE "TABLE_SCHEMA" = DATABASE() AND "TABLE_NAME" = ?), 0)'];
+            $parameters[] = $table;
+            foreach ($tables as $source => $column) {
+                $maxima[] = sprintf('COALESCE((SELECT MAX("%s") FROM "%s"), 0)', $column, $source);
+            }
+
+            $columns[] = sprintf('GREATEST(%s) AS "%s"', implode(', ', $maxima), $table);
         }
 
-        return (int) DB::query('SELECT GREATEST(' . implode(', ', $maxima) . ', 0)')->value();
+        $floors = self::withLiveStatistics(
+            static fn (): ?array => DB::prepared_query('SELECT ' . implode(', ', $columns), $parameters)->record(),
+        );
+
+        return array_map(intval(...), $floors ?? []);
+    }
+
+    /**
+     * MySQL 8 serves information_schema's AUTO_INCREMENT from a statistics cache that is a day old by default;
+     * MariaDB has no such cache, nor the variable.
+     *
+     * @template T
+     *
+     * @param callable(): T $query
+     *
+     * @return T
+     */
+    private static function withLiveStatistics(callable $query): mixed
+    {
+        $expiry = DB::query("SHOW VARIABLES LIKE 'information_schema_stats_expiry'")->record()['Value'] ?? null;
+        if (!is_numeric($expiry)) {
+            return $query();
+        }
+
+        DB::query('SET SESSION information_schema_stats_expiry = 0');
+        try {
+            return $query();
+        } finally {
+            DB::query('SET SESSION information_schema_stats_expiry = ' . (int) $expiry);
+        }
     }
 }

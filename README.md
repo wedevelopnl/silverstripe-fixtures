@@ -48,7 +48,7 @@ Page:
 
 - Any key is a database field or a relation of the class. Keys starting with `@` belong to the loader.
 - **State every value.** The loader adds only the class, the creation and edit time, and the defaults the class declares in `$defaults`. Nothing computed in `onBeforeWrite()`, `onAfterPopulateDefaults()` or another hook is filled in, so a page needs its `URLSegment` and `Sort` written out.
-- `ID` is not settable; the loader numbers the records above the highest ID the table holds. Refer to other records by name.
+- `ID` is not settable; the loader numbers the records above the highest ID the table, its live and version tables hold and above the table's auto-increment counter, so no ID is handed out twice, not even after a reset. Refer to other records by name.
 - References resolve across all files of one load. The same class and identifier twice in one load is refused, and so is an identifier with whitespace, which no reference could name.
 
 ### Relations
