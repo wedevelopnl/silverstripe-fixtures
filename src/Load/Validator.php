@@ -37,6 +37,7 @@ final readonly class Validator
 
         $problems = [];
         $places = [];
+        $pairs = [];
         foreach ($records as $record) {
             $class = $this->schemas->resolve($record->class);
             if ($class === null) {
@@ -45,7 +46,7 @@ final readonly class Validator
             }
 
             $schema = $this->schemas->forClass($class);
-            $recordProblems = $this->recordProblems($record, $schema, $keys);
+            $recordProblems = [...$this->recordProblems($record, $schema, $keys), ...$this->joinPairProblems($record, $schema, $keys, $pairs)];
             if ($schema->isFile) {
                 $recordProblems = [...$recordProblems, ...$this->samePlaceProblems($record, $places), ...$this->parentCycleProblems($record, $keys)];
             }
@@ -229,6 +230,48 @@ final readonly class Validator
         }
 
         return [];
+    }
+
+    /**
+     * write() keeps one join row per pair of records, so a pair stated again, in the same list or from the other
+     * side of the relation, must state the same extra field values.
+     *
+     * @param array<string, FixtureRecord> $keys
+     * @param array<string, array{array<mixed>, string}> $pairs extra field values and where they were first stated,
+     *                                                       by join table and pair
+     *
+     * @return list<string>
+     */
+    private function joinPairProblems(FixtureRecord $record, ClassSchema $schema, array $keys, array &$pairs): array
+    {
+        $problems = [];
+        foreach ($record->fields as $field => $value) {
+            if ($schema->kind($field) !== FieldKind::ManyMany || !is_array($value) || !array_is_list($value)) {
+                continue;
+            }
+
+            /** @var array{join: string, parentField: string, childField: string} $component validated as a many_many */
+            $component = DataObject::getSchema()->manyManyComponent($schema->class, $field);
+            foreach ($value as $item) {
+                $reference = Reference::parse(is_array($item) ? $item['ref'] ?? null : $item);
+                if ($reference === null || !isset($keys[$reference])) {
+                    continue;
+                }
+
+                $sides = [$component['parentField'] => $record->key(), $component['childField'] => $reference];
+                ksort($sides);
+                $pair = serialize([$component['join'], $sides]);
+                $extras = is_array($item) ? array_diff_key($item, ['ref' => true]) : [];
+                ksort($extras);
+                if (!isset($pairs[$pair])) {
+                    $pairs[$pair] = [$extras, sprintf('%s "%s"', $record->key(), $field)];
+                } elseif ($pairs[$pair][0] !== $extras) {
+                    $problems[] = sprintf('"%s" pairs it with %s again, with other extra field values than %s', $field, $reference, $pairs[$pair][1]);
+                }
+            }
+        }
+
+        return $problems;
     }
 
     /**

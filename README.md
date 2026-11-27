@@ -57,7 +57,7 @@ Page:
 |---|---|
 | has_one | On the record that holds it: `Parent: =>Page.home` fills `ParentID`. A polymorphic has_one also fills `ParentClass`. |
 | has_many | Not settable from the parent: set the has_one on each child. |
-| many_many | A list of references on the declaring side: `Tags: [=>Tag.red, =>Tag.blue]`. An item with extra fields is a map: `{ ref: =>Tag.blue, Weight: 3 }`. The framework's comma-separated string (`=>Tag.red,=>Tag.blue`) refuses the load. |
+| many_many | A list of references on the declaring side: `Tags: [=>Tag.red, =>Tag.blue]`. An item with extra fields is a map: `{ ref: =>Tag.blue, Weight: 3 }`. The framework's comma-separated string (`=>Tag.red,=>Tag.blue`) refuses the load. A belongs_many_many takes the same list. A pair stated twice, in one list or from both sides, is one join row, as `write()` keeps it; stated twice with different extra field values it refuses the load. |
 | many_many through | Declare records of the join class, with their two has_ones. |
 
 A reference is only resolved on a has_one or many_many. A column that holds one, such as the framework's `ParentID: =>Page.home`, or a value under `@locales` refuses the load: write `Parent: =>Page.home`.

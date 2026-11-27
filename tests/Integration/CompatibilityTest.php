@@ -108,6 +108,11 @@ final class CompatibilityTest extends SapphireTest
         $child->update(['Title' => 'Child', 'PriceAmount' => 3, 'PriceCurrency' => 'USD', 'ParentID' => $root->ID]);
         $child->write();
         $child->Related()->add($root);
+        // A pair stated twice, or on both sides, is one join row
+        $child->Tags()->add($red);
+        $child->Tags()->add($red);
+        $red->Plains()->add($root);
+        $blue->Plains()->add($child);
 
         $leaf = Sub::create();
         $leaf->update(['Title' => 'Leaf', 'Level' => 2]);
