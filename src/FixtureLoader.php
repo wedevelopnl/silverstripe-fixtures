@@ -20,7 +20,7 @@ use WeDevelop\Fixtures\Load\LoadPlanner;
 use WeDevelop\Fixtures\Load\LookupFetcher;
 use WeDevelop\Fixtures\Load\RowWriter;
 use WeDevelop\Fixtures\Load\Validator;
-use WeDevelop\Fixtures\Reset\LedgerReset;
+use WeDevelop\Fixtures\Reset\DatabaseReset;
 use WeDevelop\Fixtures\Schema\SchemaMap;
 use WeDevelop\Fixtures\Schema\ValueConverter;
 
@@ -103,7 +103,7 @@ class FixtureLoader
         $classes = static::config()->get('reset_classes');
         $deleted = [];
         $this->connection()->withTransaction(static function () use ($classes, &$deleted): void {
-            $deleted = (new LedgerReset())->reset($classes);
+            $deleted = (new DatabaseReset())->reset($classes);
         });
         $this->flushCaches([...$classes, ...$deleted]);
     }

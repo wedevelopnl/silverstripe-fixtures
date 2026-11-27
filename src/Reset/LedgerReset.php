@@ -4,20 +4,13 @@ declare(strict_types=1);
 
 namespace WeDevelop\Fixtures\Reset;
 
-use SilverStripe\Core\ClassInfo;
-use SilverStripe\Core\Config\Config;
-use SilverStripe\ORM\DataObject;
-use SilverStripe\ORM\DataObjectSchema;
-use SilverStripe\ORM\DB;
-use SilverStripe\ORM\ManyManyThroughList;
-use SilverStripe\ORM\Queries\SQLDelete;
-use SilverStripe\ORM\Queries\SQLSelect;
-use WeDevelop\Fixtures\FixtureLedger;
-
 /**
- * Deletes the records the ledger holds and the records of the configured classes, from every table of their
- * chain, stages, versions and localised tables, with the many_many join rows and join records that point at them,
- * then empties the ledger. DML only: a schema statement would end an open test transaction.
+ * Plans a reset in phases around the reads only the database can answer: which records the ledger and the
+ * configured classes select, by base table, and then the deletes from every table of their chain, stages,
+ * versions and localised tables, with the many_many join rows that point at them. DatabaseReset runs the reads
+ * and the deletes.
+ *
+ * @phpstan-type Join array{join: string, parentBase: string|null, childBase: string|null, parentField: string, childField: string}
  */
 final class LedgerReset
 {
@@ -38,83 +31,26 @@ final class LedgerReset
      */
     private const array RECORD_TABLES = ['', '_Live', '_Versions'];
 
-    private DataObjectSchema $schema;
-
-    /**
-     * @var array<string, string> existing table names by lower-case name
-     */
-    private array $tables;
-
     /**
      * @var array<string, Condition> the records to delete, by base table
      */
-    private array $families;
+    private array $families = [];
 
     /**
      * @var array<string, Condition> the rows to delete, by many_many join table
      */
-    private array $joinTables;
+    private array $joinTables = [];
 
     /**
-     * @param list<class-string<DataObject>> $resetClasses
-     *
-     * @return list<string> classes whose records were deleted
+     * @param array<string, string> $tables existing table names by lower-case name
      */
-    public function reset(array $resetClasses): array
+    public function __construct(private readonly array $tables)
     {
-        $this->schema = DataObject::getSchema();
-        /** @var array<string, string> $tables */
-        $tables = DB::table_list();
-        $this->tables = $tables;
-        $ledgerTable = (string) $this->schema->tableName(FixtureLedger::class);
-
-        $this->families = [];
-        $this->joinTables = [];
-        $ledger = SQLSelect::create(['"TableName"', '"FirstID"', '"LastID"'], '"' . $ledgerTable . '"')->execute();
-        /** @var array{TableName: string, FirstID: int|string, LastID: int|string} $entry */
-        foreach ($ledger as $entry) {
-            $this->addLedgerEntry($entry['TableName'], (int) $entry['FirstID'], (int) $entry['LastID']);
-        }
-
-        foreach ($resetClasses as $class) {
-            $this->addResetClass($class);
-        }
-
-        // Join records first: they are deleted as records, with their own chain
-        $joins = $this->joins();
-        foreach ($joins as $join) {
-            if ($join['relationClass'] === ManyManyThroughList::class) {
-                $this->addJoinRecords($join);
-            }
-        }
-
-        $deleted = [];
-        foreach ($this->families as $baseTable => $condition) {
-            if (!$condition->isEmpty()) {
-                $deleted = [...$deleted, ...$this->deleteFamily($baseTable, $condition)];
-            }
-        }
-
-        foreach ($this->joinTables as $table => $condition) {
-            $this->delete($table, 'ID', $condition);
-        }
-
-        foreach ($joins as $join) {
-            $references = $this->references($join);
-            if ($join['relationClass'] !== ManyManyThroughList::class && $references !== null && isset($this->tables[strtolower($join['join'])])) {
-                SQLDelete::create('"' . $join['join'] . '"')->addWhere($references)->execute();
-            }
-        }
-
-        SQLDelete::create('"' . $ledgerTable . '"')->execute();
-
-        return array_values(array_unique($deleted));
     }
 
-    private function addLedgerEntry(string $table, int $first, int $last): void
+    public function addLedgerEntry(string $table, bool $isBaseTable, int $first, int $last): void
     {
-        $class = $this->schema->tableClass($table);
-        if ($class !== null && $this->schema->baseDataTable($class) === $table) {
+        if ($isBaseTable) {
             $this->family($table)->addRange($first, $last);
         } else {
             ($this->joinTables[$table] ??= new Condition())->addRange($first, $last);
@@ -122,85 +58,46 @@ final class LedgerReset
     }
 
     /**
-     * @param class-string<DataObject> $class
+     * @param list<string> $classNames a reset class and its subclasses
+     *
+     * @return array<string, list<string>> a WHERE clause selecting their records, and its parameters
      */
-    private function addResetClass(string $class): void
+    public static function classCondition(array $classNames): array
     {
-        $classNames = array_values(ClassInfo::subclassesFor($class));
-        $this->addRecords(
-            $this->schema->baseDataTable($class),
-            [sprintf('"ClassName" IN (%s)', DB::placeholders($classNames)) => $classNames],
-        );
+        return [sprintf('"ClassName" IN (%s)', implode(', ', array_fill(0, count($classNames), '?'))) => $classNames];
     }
 
     /**
-     * Every many_many relation, once per join table or join class: a belongs_many_many shares its many_many's.
-     *
-     * @return list<array{relationClass: string, parentClass: class-string<DataObject>, childClass: class-string<DataObject>, parentField: string, childField: string, join: string}>
+     * @return array<string, string> ID column by existing table of a base table that holds a record's ClassName
      */
-    private function joins(): array
+    public function recordTables(string $baseTable): array
     {
-        $joins = [];
-        foreach (ClassInfo::subclassesFor(DataObject::class, false) as $class) {
-            $manyMany = Config::inst()->get($class, 'many_many', Config::UNINHERITED);
-            foreach (array_keys(is_array($manyMany) ? $manyMany : []) as $name) {
-                /** @var array{relationClass: string, parentClass: class-string<DataObject>, childClass: class-string<DataObject>, parentField: string, childField: string, join: string} $join */
-                $join = $this->schema->manyManyComponent($class, (string) $name);
-                $joins[$join['join'] . '.' . $join['parentField'] . '.' . $join['childField']] = $join;
-            }
-        }
-
-        return array_values($joins);
+        return $this->existing($baseTable, self::RECORD_TABLES);
     }
 
     /**
-     * Adds the records of a many_many through join class that point at a record this reset deletes.
-     *
-     * @param array{parentClass: class-string<DataObject>, childClass: class-string<DataObject>, parentField: string, childField: string, join: string} $join
+     * @param list<int> $ids records of the base table to delete
      */
-    private function addJoinRecords(array $join): void
+    public function addIds(string $baseTable, array $ids): void
     {
-        $references = $this->references($join);
-        if ($references !== null) {
-            $this->addRecords($this->schema->baseDataTable($join['join']), $references);
-        }
-    }
-
-    /**
-     * Adds the records of a base table that match a WHERE clause in any of their record tables.
-     *
-     * @param array<string, list<int|string>> $where a WHERE clause and its parameters
-     */
-    private function addRecords(string $baseTable, array $where): void
-    {
-        $family = $this->family($baseTable);
-        foreach ($this->existing($baseTable, self::RECORD_TABLES) as $table => $column) {
-            /** @var list<int|string> $ids */
-            $ids = SQLSelect::create('DISTINCT "' . $column . '"', '"' . $table . '"', $where)->execute()->column();
-            $family->addIds(array_map(intval(...), $ids));
-        }
-    }
-
-    private function family(string $baseTable): Condition
-    {
-        return $this->families[$baseTable] ??= new Condition();
+        $this->family($baseTable)->addIds($ids);
     }
 
     /**
      * The rows of a join that point at a record this reset deletes, on either side; null when it deletes no
      * record of either side's class. A polymorphic side names no class to match the ID against, and is skipped.
      *
-     * @param array{parentClass: class-string<DataObject>, childClass: class-string<DataObject>, parentField: string, childField: string} $join
+     * @param Join $join
      *
      * @return array<string, list<int>>|null a WHERE clause and its parameters
      */
-    private function references(array $join): ?array
+    public function references(array $join): ?array
     {
         $clauses = [];
         $parameters = [];
         foreach (['parent', 'child'] as $side) {
-            $class = $join[$side . 'Class'];
-            $condition = $class === DataObject::class ? null : $this->families[$this->schema->baseDataTable($class)] ?? null;
+            $base = $join[$side . 'Base'];
+            $condition = $base === null ? null : $this->families[$base] ?? null;
             if ($condition !== null && !$condition->isEmpty()) {
                 [$sql, $sideParameters] = $condition->toSql($join[$side . 'Field']);
                 $clauses[] = $sql;
@@ -212,37 +109,87 @@ final class LedgerReset
     }
 
     /**
-     * Deletes the selected records of one base table from the tables of the classes they have: a record's rows
-     * live only in its own chain, so the tables of other subclasses are skipped.
+     * The statements that find the classes of the records to delete, each family's from its record tables.
      *
-     * @return list<string> the classes of the deleted records
+     * @return array<string, list<array{string, list<int>}>> statement and parameters, by family base table
      */
-    private function deleteFamily(string $baseTable, Condition $condition): array
+    public function classNameReads(): array
     {
-        $found = [];
-        foreach ($this->existing($baseTable, self::RECORD_TABLES) as $table => $column) {
-            [$sql, $parameters] = $condition->toSql($column);
-            /** @var list<string> $classNames */
-            $classNames = DB::prepared_query(sprintf('SELECT DISTINCT "ClassName" FROM "%s" WHERE %s', $table, $sql), $parameters)->column();
-            $found = [...$found, ...$classNames];
-        }
+        $reads = [];
+        foreach ($this->families as $baseTable => $condition) {
+            if ($condition->isEmpty()) {
+                continue;
+            }
 
-        // A class removed from the code base since has no ancestry, so only the base table is cleared for it
-        $classNames = array_values(array_unique($found));
-        $tables = [$baseTable];
-        foreach ($classNames as $className) {
-            foreach (ClassInfo::ancestry($className, true) as $tableClass) {
-                $tables[] = (string) $this->schema->tableName($tableClass);
+            $reads[$baseTable] = [];
+            foreach ($this->recordTables($baseTable) as $table => $column) {
+                [$sql, $parameters] = $condition->toSql($column);
+                $reads[$baseTable][] = [sprintf('SELECT DISTINCT "ClassName" FROM "%s" WHERE %s', $table, $sql), $parameters];
             }
         }
 
-        foreach (array_unique($tables) as $table) {
-            foreach ($this->existing($table, array_keys(self::SUFFIXES)) as $suffixed => $column) {
-                $this->delete($suffixed, $column, $condition);
+        return $reads;
+    }
+
+    /**
+     * Every delete in the order it runs: each family from the tables of the classes it has, as a record's rows
+     * live only in its own chain; then the join rows the ledger holds; then the join rows that point at a deleted
+     * record.
+     *
+     * @param array<string, list<string>> $classNames the classes classNameReads() found, by family base table
+     * @param array<string, list<string>> $classTables the tables of each found class; none for a class removed
+     *                                                 from the code base, which has only its base table cleared
+     * @param list<Join> $joins the many_many joins that are no through
+     *
+     * @return list<array{string, array<string, list<int>>}> table and WHERE clause with its parameters
+     */
+    public function deletes(array $classNames, array $classTables, array $joins): array
+    {
+        $deletes = [];
+        foreach ($this->families as $baseTable => $condition) {
+            if ($condition->isEmpty()) {
+                continue;
+            }
+
+            $tables = [$baseTable];
+            foreach ($classNames[$baseTable] ?? [] as $className) {
+                $tables = [...$tables, ...$classTables[$className] ?? []];
+            }
+
+            foreach (array_unique($tables) as $table) {
+                foreach ($this->existing($table, array_keys(self::SUFFIXES)) as $suffixed => $column) {
+                    $deletes[] = [$suffixed, $this->where($condition, $column)];
+                }
             }
         }
 
-        return $classNames;
+        foreach ($this->joinTables as $table => $condition) {
+            $deletes[] = [$table, $this->where($condition, 'ID')];
+        }
+
+        foreach ($joins as $join) {
+            $references = $this->references($join);
+            if ($references !== null && isset($this->tables[strtolower($join['join'])])) {
+                $deletes[] = [$join['join'], $references];
+            }
+        }
+
+        return $deletes;
+    }
+
+    private function family(string $baseTable): Condition
+    {
+        return $this->families[$baseTable] ??= new Condition();
+    }
+
+    /**
+     * @return array<string, list<int>>
+     */
+    private function where(Condition $condition, string $column): array
+    {
+        [$sql, $parameters] = $condition->toSql($column);
+
+        return [$sql => $parameters];
     }
 
     /**
@@ -260,11 +207,5 @@ final class LedgerReset
         }
 
         return $existing;
-    }
-
-    private function delete(string $table, string $column, Condition $condition): void
-    {
-        [$sql, $parameters] = $condition->toSql($column);
-        SQLDelete::create('"' . $table . '"')->addWhere([$sql => $parameters])->execute();
     }
 }
