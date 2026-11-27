@@ -192,6 +192,34 @@ final class FixtureLoaderTest extends SapphireTest
         $this->assertNotNull(Tag::get()->byID($siteTag->ID));
     }
 
+    public function testResetRemovesTheJoinRowsAndJoinRecordsOfRemovedRecordsOnly(): void
+    {
+        $siteTag = $this->tag('Site tag');
+        $sitePlain = Plain::create();
+        $sitePlain->Title = 'Site plain';
+        $sitePlain->write();
+        $sitePlain->Tags()->add($siteTag);
+        $keptLink = PlainLink::create(['FromID' => $sitePlain->ID, 'ToID' => $siteTag->ID]);
+        $keptLink->write();
+        $loaded = FixtureLoader::singleton()->load(self::FIXTURES . 'tags.yml', self::FIXTURES . 'plains.yml');
+        $red = $loaded->idOf(Tag::class, 'red');
+        // Added at runtime, so outside the ledger: a loaded record on either side
+        Plain::get()->byID($loaded->idOf(Plain::class, 'first'))?->Tags()->add($siteTag);
+        $sitePlain->Tags()->add($red);
+        PlainLink::create(['FromID' => $sitePlain->ID, 'ToID' => $red])->write();
+
+        FixtureLoader::singleton()->reset();
+
+        $this->assertSame(
+            [[(string) $sitePlain->ID, (string) $siteTag->ID]],
+            array_map(
+                static fn (array $row): array => [(string) $row['FixturesTest_PlainID'], (string) $row['FixturesTest_TagID']],
+                iterator_to_array(DB::query('SELECT "FixturesTest_PlainID", "FixturesTest_TagID" FROM "FixturesTest_Plain_Tags"'), false),
+            ),
+        );
+        $this->assertSame([$keptLink->ID], PlainLink::get()->column('ID'));
+    }
+
     public function testALoadAndResetInsideAnOpenTransactionAreUndoneWithIt(): void
     {
         $connection = DB::get_conn();
