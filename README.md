@@ -10,7 +10,7 @@ The loader reads fixture files in the framework's YAML shape, checks them agains
 
 - PHP ^8.3
 - `silverstripe/framework` ^6.0
-- MySQL or MariaDB
+- MySQL 8 (tested) or MariaDB (untested)
 
 Optional, for the features that need them:
 
@@ -181,7 +181,7 @@ A named class is cleared with its subclasses, selected by `ClassName`: naming `P
 - One version per record: no edit history, nothing modified after publishing, nothing unpublished after publishing.
 - Values computed by hooks are not filled in; fixtures state them.
 - `ChangeSet` and `ChangeSetItem` rows are not written; declare them as fixture records when a test needs them.
-- MySQL and MariaDB only.
+- MySQL and MariaDB only, and only MySQL 8 is tested: the test harness and CI run MySQL 8. On MariaDB, numbering above the auto-increment counter relies on its `information_schema` reporting the counter live.
 
 ## Benchmark
 
