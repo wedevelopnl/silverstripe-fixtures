@@ -16,3 +16,7 @@ coverage/
 
 # StoryFlow local config
 .storyflow/
+
+# Written by silverstripe/vendor-plugin on a host-side composer install; the
+# harness serves /app/public, never this one
+/public/
