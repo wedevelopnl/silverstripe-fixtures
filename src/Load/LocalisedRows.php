@@ -27,13 +27,9 @@ final class LocalisedRows
             }
 
             foreach ($schema->localisedTables ?? [] as $table => $fields) {
+                // Every table, even one the record states nothing of: a first write in a locale forces every field
+                // as changed, so Fluent localises each table of the chain
                 $row = array_intersect_key([...$draftRows[$table], ...$localeValues], array_flip($fields));
-                // Fluent localises a subclass table only when the write touched it; the base table always, as it
-                // tells in which locales the record exists
-                if ($table !== $schema->baseTable && $row === [] && count($draftRows[$table]) === 1) {
-                    continue;
-                }
-
                 self::addRow($plan, $schema, $table . self::SUFFIX, ['RecordID' => $id, 'Locale' => $locale, ...$row], $record->published === true);
             }
         }

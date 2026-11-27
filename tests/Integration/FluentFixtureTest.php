@@ -96,28 +96,39 @@ final class FluentFixtureTest extends SapphireTest
         $this->assertTrue($draft->isDraftedInLocale('nl_NL'));
     }
 
-    public function testLocalisedRowsAreTheRowsWriteLeavesInEachLocale(): void
+    public function testLocalisedRowsAreTheRowsWriteAndPublishLeaveInEachLocale(): void
     {
         $this->requireFluent();
-        $tables = ['FixturesTest_LocalisedRecord_Localised', 'FixturesTest_LocalisedSub_Localised'];
+        $tables = [];
+        foreach (['FixturesTest_LocalisedRecord', 'FixturesTest_LocalisedSub'] as $table) {
+            foreach (['', '_Live', '_Versions'] as $suffix) {
+                $tables[] = $table . '_Localised' . $suffix;
+            }
+        }
+
         FixtureLoader::singleton()->load(self::FIXTURES . 'locales.yml');
         DBDatetime::set_mock_now('2026-11-27 10:00:00');
-        $record = LocalisedSub::create();
-        $this->writeInLocale('en_US', $record, ['Title' => 'Sub', 'Summary' => 'A summary', 'Rating' => 4]);
-        $this->writeInLocale('nl_NL', $record, ['Title' => 'Onder', 'Summary' => 'Een samenvatting']);
-        $written = $this->snapshot($tables, ['sub' => $record->ID]);
-        $this->assertCount(2, $written['FixturesTest_LocalisedSub_Localised']);
+        $this->logOut();
+        $sub = LocalisedSub::create();
+        $this->writeInLocale('en_US', $sub, ['Title' => 'Sub', 'Summary' => 'A summary', 'Rating' => 4], true);
+        $this->writeInLocale('nl_NL', $sub, ['Title' => 'Onder', 'Summary' => 'Een samenvatting'], true);
+        // Nothing of the subclass table stated: write() still gives it a localised row
+        $bare = LocalisedSub::create();
+        $this->writeInLocale('nl_NL', $bare, ['Title' => 'Kaal'], false);
+        $written = $this->snapshot($tables, ['sub' => $sub->ID, 'bare' => $bare->ID]);
+        $this->assertCount(2, $written['FixturesTest_LocalisedSub_Localised_Live'], 'sub is published in both locales');
+        $this->assertSame(['bare', 'sub', 'sub'], array_column($written['FixturesTest_LocalisedSub_Localised'], 'RecordID'));
         $this->emptyTables($tables);
 
-        $loaded = FixtureLoader::singleton()->load(self::FIXTURES . 'localised.yml');
+        $loaded = FixtureLoader::singleton()->load(self::FIXTURES . 'localised-rows.yml');
+        [$loadedRows, $loadedVersions] = $this->latestVersionOnly($this->snapshot($tables, [
+            'sub' => $loaded->idOf(LocalisedSub::class, 'sub'),
+            'bare' => $loaded->idOf(LocalisedSub::class, 'bare'),
+        ]));
 
-        $this->assertSame(
-            $written,
-            array_map(
-                static fn (array $rows): array => array_values(array_filter($rows, static fn (array $row): bool => $row['RecordID'] === 'sub')),
-                $this->snapshot($tables, ['sub' => $loaded->idOf(LocalisedSub::class, 'sub')]),
-            ),
-        );
+        // The loader writes one version per locale: it is compared with the latest of write()'s
+        $this->assertSame($this->latestVersionOnly($written)[0], $loadedRows);
+        $this->assertSame([1], $loadedVersions);
     }
 
     public function testAPageShowsEachLanguageWithItsOwnTitle(): void
@@ -255,12 +266,15 @@ final class FluentFixtureTest extends SapphireTest
     /**
      * @param array<string, mixed> $values
      */
-    private function writeInLocale(string $locale, DataObject $record, array $values): void
+    private function writeInLocale(string $locale, LocalisedSub $record, array $values, bool $publish): void
     {
-        FluentState::singleton()->withState(static function (FluentState $state) use ($locale, $record, $values): void {
+        FluentState::singleton()->withState(static function (FluentState $state) use ($locale, $record, $values, $publish): void {
             $state->setLocale($locale);
             $record->update($values);
             $record->write();
+            if ($publish) {
+                $record->publishSingle();
+            }
         });
     }
 }
