@@ -228,7 +228,8 @@ final readonly class Validator
     private function manyManyProblem(string $class, string $field, mixed $value, array $keys): ?string
     {
         if (!is_array($value) || !array_is_list($value)) {
-            return sprintf('"%s" must be a list of references', $field);
+            // The framework also takes a comma-separated string; this loader takes the list form only
+            return sprintf('"%s" must be a list of references, like [=>Class.a, =>Class.b]', $field);
         }
 
         $extraFields = DataObject::getSchema()->manyManyExtraFieldsForComponent($class, $field) ?? [];
