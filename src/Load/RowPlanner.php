@@ -97,7 +97,7 @@ final readonly class RowPlanner
         }
 
         foreach ($record->fields as $field => $value) {
-            if ($schema->kind($field) === FieldKind::ManyMany && is_array($value)) {
+            if ($schema->kind($field) === FieldKind::ManyMany) {
                 $this->planJoinRows($plan, $schema->class, $field, $id, $value);
             }
         }
@@ -109,8 +109,8 @@ final readonly class RowPlanner
     private function joinTables(FixtureRecord $record, ClassSchema $schema): array
     {
         $tables = [];
-        foreach ($record->fields as $field => $value) {
-            if ($schema->kind($field) === FieldKind::ManyMany && is_array($value)) {
+        foreach (array_keys($record->fields) as $field) {
+            if ($schema->kind($field) === FieldKind::ManyMany) {
                 /** @var array{join: string} $component validated as a many_many */
                 $component = DataObject::getSchema()->manyManyComponent($schema->class, $field);
                 $tables[] = $component['join'];
@@ -221,9 +221,9 @@ final readonly class RowPlanner
 
     /**
      * @param class-string<DataObject> $class
-     * @param array<mixed> $items references, or maps of a reference (`ref`) and extra field values
+     * @param mixed $value a list of many_many items, as validated
      */
-    private function planJoinRows(Plan $plan, string $class, string $field, int $id, array $items): void
+    private function planJoinRows(Plan $plan, string $class, string $field, int $id, mixed $value): void
     {
         $schema = DataObject::getSchema();
         /** @var array{join: string, parentField: string, childField: string} $component validated as a many_many */
@@ -231,20 +231,19 @@ final readonly class RowPlanner
         /** @var array<string, string> $extraFields */
         $extraFields = $schema->manyManyExtraFieldsForComponent($class, $field) ?? [];
         $table = $component['join'];
-        foreach ($items as $item) {
+        foreach (ManyManyItem::listOf($value) ?? [] as $item) {
             $sides = [
                 $component['parentField'] => $id,
-                $component['childField'] => $plan->idOf((string) Reference::parse(is_array($item) ? $item['ref'] : $item)),
+                $component['childField'] => $plan->idOf((string) Reference::parse($item->reference)),
             ];
             if (!$plan->claimPair($table, $sides)) {
                 // Stated before with the same extra field values, as the validator ensures
                 continue;
             }
 
-            $extras = is_array($item) ? array_diff_key($item, ['ref' => true]) : [];
             $row = ['ID' => $plan->claim($table), ...$sides];
-            foreach ($extras as $name => $value) {
-                $row = [...$row, ...ClassSchema::convert($extraFields[$name], (string) $name, $value)];
+            foreach ($item->extras as $name => $extra) {
+                $row = [...$row, ...ClassSchema::convert($extraFields[$name], (string) $name, $extra)];
             }
 
             $plan->add($table, $row);

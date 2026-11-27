@@ -280,14 +280,15 @@ final readonly class Validator
     {
         $problems = [];
         foreach ($record->fields as $field => $value) {
-            if ($schema->kind($field) !== FieldKind::ManyMany || !is_array($value) || !array_is_list($value)) {
+            $items = $schema->kind($field) === FieldKind::ManyMany ? ManyManyItem::listOf($value) : null;
+            if ($items === null) {
                 continue;
             }
 
             /** @var array{join: string, parentField: string, childField: string} $component validated as a many_many */
             $component = DataObject::getSchema()->manyManyComponent($schema->class, $field);
-            foreach ($value as $item) {
-                $reference = Reference::parse(is_array($item) ? $item['ref'] ?? null : $item);
+            foreach ($items as $item) {
+                $reference = Reference::parse($item->reference);
                 if ($reference === null || !isset($keys[$reference])) {
                     continue;
                 }
@@ -295,7 +296,7 @@ final readonly class Validator
                 $sides = [$component['parentField'] => $record->key(), $component['childField'] => $reference];
                 ksort($sides);
                 $pair = serialize([$component['join'], $sides]);
-                $extras = is_array($item) ? array_diff_key($item, ['ref' => true]) : [];
+                $extras = $item->extras;
                 ksort($extras);
                 if (!isset($pairs[$pair])) {
                     $pairs[$pair] = [$extras, sprintf('%s "%s"', $record->key(), $field)];
@@ -367,20 +368,19 @@ final readonly class Validator
      */
     private function manyManyProblem(string $class, string $field, mixed $value, array $keys): ?string
     {
-        if (!is_array($value) || !array_is_list($value)) {
-            // The framework also takes a comma-separated string; this loader takes the list form only
+        $items = ManyManyItem::listOf($value);
+        if ($items === null) {
             return sprintf('"%s" must be a list of references, like [=>Class.a, =>Class.b]', $field);
         }
 
         $extraFields = DataObject::getSchema()->manyManyExtraFieldsForComponent($class, $field) ?? [];
-        foreach ($value as $item) {
-            $extra = is_array($item) ? array_diff_key($item, ['ref' => true]) : [];
-            $unknown = array_diff_key($extra, $extraFields);
+        foreach ($items as $item) {
+            $unknown = array_diff_key($item->extras, $extraFields);
             if ($unknown !== []) {
                 return sprintf('"%s" has no extra field "%s"', $field, array_key_first($unknown));
             }
 
-            $problem = $this->referenceProblem($field, is_array($item) ? $item['ref'] ?? null : $item, $keys);
+            $problem = $this->referenceProblem($field, $item->reference, $keys);
             if ($problem !== null) {
                 return $problem;
             }
