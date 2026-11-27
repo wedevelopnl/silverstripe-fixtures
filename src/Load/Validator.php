@@ -43,7 +43,7 @@ final readonly class Validator
             $schema = $this->schemas->forClass($class);
             $recordProblems = $this->recordProblems($record, $schema, $keys);
             if ($schema->isFile) {
-                $recordProblems = [...$recordProblems, ...self::samePlaceProblems($record, $places)];
+                $recordProblems = [...$recordProblems, ...$this->samePlaceProblems($record, $places)];
             }
 
             foreach ($recordProblems as $problem) {
@@ -107,7 +107,7 @@ final readonly class Validator
             foreach ($values as $field => $value) {
                 if (!in_array($field, $translated, true)) {
                     $problems[] = sprintf('"@locales": "%s" is not translated (%s)', $field, $locale);
-                } elseif (self::isReference($value)) {
+                } elseif ($this->isReference($value)) {
                     $problems[] = sprintf('"@locales": "%s" cannot hold a reference (%s)', $field, $locale);
                 }
             }
@@ -181,7 +181,7 @@ final readonly class Validator
      *
      * @return list<string>
      */
-    private static function samePlaceProblems(FixtureRecord $record, array &$places): array
+    private function samePlaceProblems(FixtureRecord $record, array &$places): array
     {
         $name = $record->fields['Name'] ?? null;
         if (!is_string($name)) {
@@ -223,7 +223,7 @@ final readonly class Validator
      */
     private function valueProblem(ClassSchema $schema, string $field, mixed $value): ?string
     {
-        if (!self::isReference($value)) {
+        if (!$this->isReference($value)) {
             return null;
         }
 
@@ -235,7 +235,7 @@ final readonly class Validator
         return sprintf('"%s" cannot hold a reference; only a has_one or many_many takes one', $field);
     }
 
-    private static function isReference(mixed $value): bool
+    private function isReference(mixed $value): bool
     {
         return is_string($value) && str_starts_with($value, '=>');
     }
