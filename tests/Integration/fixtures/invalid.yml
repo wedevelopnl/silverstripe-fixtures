@@ -12,6 +12,8 @@ WeDevelop\Fixtures\Tests\Integration\Model\Plain:
         Weight: 1
     Links:
       - =>WeDevelop\Fixtures\Tests\Integration\Model\Tag.red
+    Children:
+      - =>WeDevelop\Fixtures\Tests\Integration\Model\Plain.broken
     ParentID: =>WeDevelop\Fixtures\Tests\Integration\Model\Plain.broken
     Body: =>WeDevelop\Fixtures\Tests\Integration\Model\Tag.red
     '@published': true

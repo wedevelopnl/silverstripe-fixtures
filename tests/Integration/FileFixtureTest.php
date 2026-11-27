@@ -57,6 +57,22 @@ final class FileFixtureTest extends SapphireTest
         $this->assertNotEmpty($image->getURL());
     }
 
+    public function testAFileInAFolderGivenByIdIsPlacedInThatFolder(): void
+    {
+        $folder = Folder::create();
+        $folder->ID = 900;
+        $folder->Name = 'site-folder';
+        $folder->write(false, true);
+
+        $loaded = FixtureLoader::singleton()->load(self::FIXTURES . 'files-in-site-folder.yml');
+
+        $file = File::get()->byID($loaded->idOf(File::class, 'notes'));
+        $this->assertNotNull($file);
+        $this->assertSame('site-folder/notes.txt', $file->getFilename());
+        $this->assertSame(900, $file->ParentID);
+        $this->assertTrue(Injector::inst()->get(AssetStore::class)->exists('site-folder/notes.txt', $file->getHash()));
+    }
+
     public function testAFileWithoutPublishedStateIsPublicWithoutStagesAndProtectedOnDraft(): void
     {
         $loaded = FixtureLoader::singleton()->load(self::FIXTURES . 'files.yml');

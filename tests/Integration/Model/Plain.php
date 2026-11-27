@@ -29,6 +29,10 @@ class Plain extends DataObject implements TestOnly
         'Target' => DataObject::class,
     ];
 
+    private static array $has_many = [
+        'Children' => Plain::class . '.Parent',
+    ];
+
     private static array $many_many = [
         'Tags' => Tag::class,
         'Related' => Plain::class,

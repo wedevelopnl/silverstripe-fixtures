@@ -74,6 +74,7 @@ final class FixtureLoaderTest extends SapphireTest
                     $where . Plain::class . '.broken: "Tags" must be a list of references, like [=>Class.a, =>Class.b]',
                     $where . Plain::class . '.broken: "Related" has no extra field "Weight"',
                     $where . Plain::class . '.broken: "Links" is a many_many through; declare records of its join class instead',
+                    $where . Plain::class . '.broken: "Children" is set on the record that holds the has_one',
                     $where . Plain::class . '.broken: "ParentID" cannot hold a reference; set the has_one instead: Parent: =>Class.identifier',
                     $where . Plain::class . '.broken: "Body" cannot hold a reference; only a has_one or many_many takes one',
                     $where . Plain::class . '.broken: "@published": ' . Plain::class . ' has no published state',
@@ -136,6 +137,34 @@ final class FixtureLoaderTest extends SapphireTest
 
         $this->assertSame(501, $loaded->idOf(Tag::class, 'red'));
         $this->assertSame(502, $loaded->idOf(Tag::class, 'blue'));
+    }
+
+    public function testATableTooLargeForOneInsertIsSplitAcrossInserts(): void
+    {
+        // 150 records each related to all 150: 22,500 join rows of three columns (ID and the two record IDs) need
+        // 67,500 placeholders, more than the 65,535 MySQL accepts in one statement
+        $count = 150;
+        $references = [];
+        for ($i = 1; $i <= $count; ++$i) {
+            $references[] = '=>' . Plain::class . '.plain' . $i;
+        }
+
+        $yaml = Plain::class . ":\n";
+        for ($i = 1; $i <= $count; ++$i) {
+            $yaml .= sprintf("  plain%d: { Title: Plain %d, Related: [%s] }\n", $i, $i, implode(', ', $references));
+        }
+
+        $path = (string) tempnam(sys_get_temp_dir(), 'fixture');
+        file_put_contents($path, $yaml);
+        try {
+            $loaded = FixtureLoader::singleton()->load($path);
+        } finally {
+            unlink($path);
+        }
+
+        $this->assertSame($count ** 2, (int) DB::query('SELECT COUNT(*) FROM "FixturesTest_Plain_Related"')->value());
+        $last = Plain::get()->byID($loaded->idOf(Plain::class, 'plain' . $count));
+        $this->assertSame($count, $last?->Related()->count());
     }
 
     public function testResetRemovesTheLoadedRecordsAndTheConfiguredClassesOnly(): void
