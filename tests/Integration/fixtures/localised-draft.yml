@@ -1,8 +1,0 @@
-WeDevelop\Fixtures\Tests\Integration\Model\LocalisedRecord:
-  home:
-    Title: Home
-    '@published': true
-    '@draft':
-      Title: Home (draft)
-    '@locales':
-      nl_NL: { Title: Thuis }

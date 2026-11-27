@@ -122,26 +122,20 @@ final readonly class ClassSchema
         $kinds += array_fill_keys([...self::configKeys($class, 'has_many'), ...self::configKeys($class, 'belongs_to')], FieldKind::HasMany);
         $joins = [];
         foreach ([...self::configKeys($class, 'many_many'), ...self::configKeys($class, 'belongs_many_many')] as $name) {
-            /** @var array{relationClass: string, join: string, parentField: string, childField: string}|null $component */
-            $component = isset($kinds[$name]) ? null : $schema->manyManyComponent($class, $name);
-            if ($component === null) {
-                continue;
+            /** @var array{relationClass: string, join: string, parentField: string, childField: string} $component declared */
+            $component = $schema->manyManyComponent($class, $name);
+            $through = $component['relationClass'] === ManyManyThroughList::class;
+            $kinds += [$name => $through ? FieldKind::ManyManyThrough : FieldKind::ManyMany];
+            if (!$through) {
+                /** @var array<string, string> $extraFields */
+                $extraFields = $schema->manyManyExtraFieldsForComponent($class, $name) ?? [];
+                $joins[$name] = [
+                    'join' => $component['join'],
+                    'parentField' => $component['parentField'],
+                    'childField' => $component['childField'],
+                    'extraFields' => $extraFields,
+                ];
             }
-
-            if ($component['relationClass'] === ManyManyThroughList::class) {
-                $kinds[$name] = FieldKind::ManyManyThrough;
-                continue;
-            }
-
-            $kinds[$name] = FieldKind::ManyMany;
-            /** @var array<string, string> $extraFields */
-            $extraFields = $schema->manyManyExtraFieldsForComponent($class, $name) ?? [];
-            $joins[$name] = [
-                'join' => $component['join'],
-                'parentField' => $component['parentField'],
-                'childField' => $component['childField'],
-                'extraFields' => $extraFields,
-            ];
         }
 
         return [$kinds, $joins];
