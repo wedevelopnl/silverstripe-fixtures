@@ -18,6 +18,8 @@ use WeDevelop\Fixtures\Tests\Integration\Model\Tag;
  */
 final class FixtureTestStateTest extends SapphireTest
 {
+    use StartsFromTheLoadedData;
+
     protected static $fixture_file = 'FixtureTestStateTest.yml';
 
     protected static $extra_dataobjects = [
@@ -38,14 +40,6 @@ final class FixtureTestStateTest extends SapphireTest
     public function testAllIdsOfAClassAreListedByFixtureName(): void
     {
         $this->assertSame(['red', 'blue'], array_keys($this->allFixtureIDs(Tag::class)));
-    }
-
-    public function testEveryTestStartsFromTheLoadedData(): void
-    {
-        $this->objFromFixture(Tag::class, 'red')->delete();
-        Tag::create(['Title' => 'Created'])->write();
-
-        $this->assertSame(['Blue', 'Created'], Tag::get()->sort('ID')->column('Title'));
     }
 
     public function testTheFixtureWentThroughTheLoader(): void
