@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-11-27
+
 ### Added
 
 - `FixtureLoader`: loads fixture files in the framework's YAML shape straight into the database, in one transaction with multi-row inserts, writing the rows `DataObject::write()` would. Returns the loaded IDs by class and identifier (`LoadedFixtures`).
@@ -15,6 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `@source` for `File`, `Image` and `Folder` records: places the file in the asset store, public when published and protected when draft-only. A relative source is relative to the fixture file that declares it.
 - `FixtureLoader::reset()` and the `reset_classes` config: clears the records loaded since the last reset, recorded in the new `FixtureLedger` table, plus the records of the named classes, with the many_many join rows and join records that point at any of them.
 - Loaded records, and join rows, are numbered above the table's auto-increment counter too, so an ID is never handed out twice, not even after a reset.
+- `FixtureLoader::reload()`: resets and loads in one transaction, so an invalid file or a database error leaves the data as it was.
+- The `fixtures` task (`sake tasks:fixtures`, `/dev/tasks/fixtures`): loads, unloads or resets fixture files without any code.
 - `WeDevelop\Fixtures\Dev\FixtureTestState`: loads a SapphireTest's `$fixture_file` through the loader when set as the `fixtures` test state.
 - `InvalidFixtureException` listing every problem of a fixture set, and `ResetRefusedException` outside the dev and test environments.
 - `task benchmark`: compares loading and clearing with the framework's fixture handling, for the whole set in one load and per file.
+
+[Unreleased]: https://github.com/wedevelopnl/silverstripe-fixtures/compare/0.1.0...HEAD
+[0.1.0]: https://github.com/wedevelopnl/silverstripe-fixtures/releases/tag/0.1.0
