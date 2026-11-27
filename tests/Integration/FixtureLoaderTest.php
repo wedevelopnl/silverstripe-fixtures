@@ -23,6 +23,7 @@ use WeDevelop\Fixtures\ResetRefusedException;
 use WeDevelop\Fixtures\Schema\ClassSchema;
 use WeDevelop\Fixtures\Schema\SchemaMap;
 use WeDevelop\Fixtures\Schema\ValueConverter;
+use WeDevelop\Fixtures\Tests\Integration\Model\Coordinate;
 use WeDevelop\Fixtures\Tests\Integration\Model\Plain;
 use WeDevelop\Fixtures\Tests\Integration\Model\PlainLink;
 use WeDevelop\Fixtures\Tests\Integration\Model\Sub;
@@ -57,6 +58,7 @@ final class FixtureLoaderTest extends SapphireTest
         SubWithoutTable::class,
         Tag::class,
         PlainLink::class,
+        Coordinate::class,
     ];
 
     public function testItLoadsFilesTogetherAndAnswersIdsInDeclarationOrder(): void
@@ -239,6 +241,14 @@ final class FixtureLoaderTest extends SapphireTest
         $this->assertSame($count ** 2, (int) DB::query('SELECT COUNT(*) FROM "FixturesTest_Plain_Related"')->value());
         $last = Plain::get()->byID($loaded->idOf(Plain::class, 'plain' . $count));
         $this->assertSame($count, $last?->Related()->count());
+    }
+
+    public function testFloatsThatPrintAlikeAreEachWrittenAsStated(): void
+    {
+        $loaded = FixtureLoader::singleton()->load(self::FIXTURES . 'coordinates.yml');
+
+        $latitude = static fn (string $key): float => (float) Coordinate::get()->byID($loaded->idOf(Coordinate::class, $key))?->Latitude;
+        $this->assertSame([52.37022216671234, 52.370222166712], [$latitude('precise'), $latitude('rounded')]);
     }
 
     public function testResetRemovesTheLoadedRecordsAndTheConfiguredClassesOnly(): void

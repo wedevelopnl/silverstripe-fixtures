@@ -10,8 +10,9 @@ use WeDevelop\Fixtures\Load\Plan;
 
 /**
  * Converts a plan's raw values to the database values their field types write, as write() does, in one pass before
- * the rows are inserted. One converter per load: it keeps every scalar it converted, so a value a record repeats on
- * its stages and versions, or a default every record has, is converted once.
+ * the rows are inserted. One converter per load: it keeps every scalar but a float it converted, so a value a record
+ * repeats on its stages and versions, or a default every record has, is converted once. A float is converted every
+ * time: as a string it holds only `precision` digits, so two floats could share a key.
  */
 final class ValueConverter
 {
@@ -64,7 +65,7 @@ final class ValueConverter
      */
     private function columns(string $spec, string $name, mixed $value): array
     {
-        if (!is_scalar($value) && $value !== null) {
+        if (is_float($value) || (!is_scalar($value) && $value !== null)) {
             return $this->convert($spec, $name, $value);
         }
 

@@ -1,0 +1,6 @@
+# Two floats that print alike at PHP's default precision of 14 digits
+WeDevelop\Fixtures\Tests\Integration\Model\Coordinate:
+  precise:
+    Latitude: 52.37022216671234
+  rounded:
+    Latitude: 52.370222166712
