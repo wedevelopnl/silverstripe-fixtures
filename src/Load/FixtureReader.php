@@ -35,12 +35,14 @@ final class FixtureReader
         $declaredIn = [];
         foreach ($files as $label => $path) {
             foreach ($this->readFile($label, $path, $problems) as $record) {
-                if (isset($declaredIn[$record->key()])) {
-                    $problems[] = sprintf('%s: is also declared in %s', $record->label(), $declaredIn[$record->key()]);
+                // The class as SchemaMap resolves it: a leading backslash and the case of a class name change nothing
+                $key = strtolower(ltrim($record->class, '\\')) . '.' . $record->identifier;
+                if (isset($declaredIn[$key])) {
+                    $problems[] = sprintf('%s: is also declared in %s', $record->label(), $declaredIn[$key]);
                     continue;
                 }
 
-                $declaredIn[$record->key()] = $label;
+                $declaredIn[$key] = $label;
                 $records[] = $record;
             }
         }
@@ -114,8 +116,10 @@ final class FixtureReader
                 $published = $this->readPublished($where, $values, $problems);
             } elseif (str_starts_with($identifier, '@')) {
                 $problems[] = sprintf('%s: unknown loader key "%s"', $where, $identifier);
+            } elseif ($values === null || $values === [] || (is_array($values) && !array_is_list($values))) {
+                $declared[] = [$identifier, $values ?? []];
             } else {
-                $declared[] = [$identifier, is_array($values) ? $values : []];
+                $problems[] = sprintf('%s.%s: expected field values by name', $where, $identifier);
             }
         }
 
