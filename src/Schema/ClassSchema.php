@@ -105,11 +105,6 @@ final readonly class ClassSchema
         };
     }
 
-    public function hasColumn(string $column): bool
-    {
-        return isset($this->columnTables[$column]);
-    }
-
     /**
      * The database values a column or composite takes for a value, converted by its field type as write() does.
      *

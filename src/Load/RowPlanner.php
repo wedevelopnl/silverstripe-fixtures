@@ -211,7 +211,7 @@ final readonly class RowPlanner
     {
         $key = (string) Reference::parse($reference);
         $values = [$field . 'ID' => $plan->idOf($key)];
-        if ($schema->hasColumn($field . 'Class')) {
+        if (isset($schema->columnTables[$field . 'Class'])) {
             // A polymorphic has_one also names the class of the record it points to
             $values[$field . 'Class'] = $plan->classOf($key);
         }
