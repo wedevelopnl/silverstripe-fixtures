@@ -1,0 +1,134 @@
+<?php
+
+declare(strict_types=1);
+
+namespace WeDevelop\Fixtures\Tests\Unit\Load;
+
+use PHPUnit\Framework\TestCase;
+use WeDevelop\Fixtures\Load\FixtureReader;
+use WeDevelop\Fixtures\Load\FixtureRecord;
+
+final class FixtureReaderTest extends TestCase
+{
+    private const string DIR = __DIR__ . '/../fixtures/';
+
+    public function testItReadsRecordsInDeclarationOrderAcrossFiles(): void
+    {
+        $set = (new FixtureReader())->read([
+            'pages.yml' => self::DIR . 'pages.yml',
+            'more.yml' => self::DIR . 'more.yml',
+        ]);
+
+        $this->assertSame([], $set->problems);
+        $this->assertSame(
+            [
+                'Page.home',
+                'Page.about',
+                'SilverStripe\Assets\Image.logo',
+                'SilverStripe\Assets\Image.banner',
+                'Page.contact',
+                'Page.empty',
+            ],
+            array_map(static fn (FixtureRecord $record): string => $record->key(), $set->records),
+        );
+    }
+
+    public function testItSplitsLoaderKeysFromFieldsAndAppliesTheClassLevelPublishedDefault(): void
+    {
+        $set = (new FixtureReader())->read(['pages.yml' => self::DIR . 'pages.yml']);
+        [$home, $about, $logo] = $set->records;
+
+        $this->assertSame('pages.yml', $home->file);
+        $this->assertSame(['Title' => 'Home'], $home->fields);
+        $this->assertTrue($home->published);
+        $this->assertSame(['nl_NL' => ['Title' => 'Thuis']], $home->locales);
+        $this->assertFalse($about->published, 'a record overrides the class default');
+        $this->assertNull($logo->published);
+        $this->assertSame('wedevelopnl/silverstripe-fixtures:tests/files/logo.png', $logo->source);
+    }
+
+    public function testARecordWithoutValuesHasNoFields(): void
+    {
+        $set = (new FixtureReader())->read(['more.yml' => self::DIR . 'more.yml']);
+
+        $this->assertSame('empty', $set->records[2]->identifier);
+        $this->assertSame([], $set->records[2]->fields);
+    }
+
+    public function testTheSameClassAndIdentifierTwiceInOneLoadNamesBothFiles(): void
+    {
+        $set = (new FixtureReader())->read([
+            'pages.yml' => self::DIR . 'pages.yml',
+            'duplicate.yml' => self::DIR . 'duplicate.yml',
+        ]);
+
+        $this->assertSame(
+            ['duplicate.yml, Page.home: is also declared in pages.yml'],
+            $set->problems,
+        );
+    }
+
+    public function testEveryMalformedLoaderKeyIsReported(): void
+    {
+        $set = (new FixtureReader())->read(['invalid-keys.yml' => self::DIR . 'invalid-keys.yml']);
+
+        $this->assertSame(
+            [
+                'invalid-keys.yml, Page: "@published" must be true or false',
+                'invalid-keys.yml, Page: unknown loader key "@sort"',
+                'invalid-keys.yml, Page.home: "@published" must be true or false',
+                'invalid-keys.yml, Page.home: "@locales" must map a locale code to field values',
+                'invalid-keys.yml, Page.home: "@source" must be a path',
+                'invalid-keys.yml, Page.home: unknown loader key "@unknown"',
+                'invalid-keys.yml, Page.about: "@locales" must map a locale code to field values',
+                'invalid-keys.yml, Member: expected records by identifier',
+            ],
+            $set->problems,
+        );
+    }
+
+    public function testAFileThatIsNotAMapOfClassesIsReported(): void
+    {
+        $set = (new FixtureReader())->read(['not-a-map.yml' => self::DIR . 'not-a-map.yml']);
+
+        $this->assertSame(['not-a-map.yml: expected classes at the top level'], $set->problems);
+    }
+
+    public function testAnEmptyFileHoldsNoRecords(): void
+    {
+        $set = (new FixtureReader())->read(['empty.yml' => self::DIR . 'empty.yml']);
+
+        $this->assertSame([], $set->records);
+        $this->assertSame([], $set->problems);
+    }
+
+    public function testAParseErrorIsReportedWithTheFile(): void
+    {
+        $set = (new FixtureReader())->read(['broken.yml' => self::DIR . 'broken.yml']);
+
+        $this->assertCount(1, $set->problems);
+        $this->assertStringStartsWith('broken.yml: cannot be parsed: ', $set->problems[0]);
+    }
+
+    public function testAFileIsParsedOncePerModificationTime(): void
+    {
+        $path = tempnam(sys_get_temp_dir(), 'fixture');
+        $this->assertIsString($path);
+        file_put_contents($path, "Page:\n  one: { Title: One }\n");
+        touch($path, 1000);
+        $reader = new FixtureReader();
+        $reader->read(['f.yml' => $path]);
+
+        file_put_contents($path, "Page:\n  two: { Title: Two }\n");
+        touch($path, 1000);
+        clearstatcache();
+        $cached = $reader->read(['f.yml' => $path]);
+        touch($path, 2000);
+        clearstatcache();
+        $fresh = $reader->read(['f.yml' => $path]);
+        unlink($path);
+
+        $this->assertSame('one', $cached->records[0]->identifier);
+        $this->assertSame('two', $fresh->records[0]->identifier);
+    }
+}

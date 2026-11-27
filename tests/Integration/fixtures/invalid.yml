@@ -1,0 +1,23 @@
+WeDevelop\Fixtures\Tests\Integration\Model\Plain:
+  broken:
+    ID: 5
+    ClassName: Other
+    Subtitle: unknown
+    TitleLength: 3
+    Parent: =>WeDevelop\Fixtures\Tests\Integration\Model\Plain.missing
+    Target: not-a-reference
+    Tags: =>WeDevelop\Fixtures\Tests\Integration\Model\Tag.red
+    Related:
+      - ref: =>WeDevelop\Fixtures\Tests\Integration\Model\Plain.broken
+        Weight: 1
+    Links:
+      - =>WeDevelop\Fixtures\Tests\Integration\Model\Tag.red
+    '@published': true
+WeDevelop\Fixtures\Tests\Integration\Model\Tag:
+  red:
+    Title: Red
+    Plains:
+      - =>WeDevelop\Fixtures\Tests\Integration\Model\Plain.missing
+Unknown\Kind:
+  thing:
+    Title: Thing

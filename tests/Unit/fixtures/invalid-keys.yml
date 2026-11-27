@@ -1,0 +1,12 @@
+Page:
+  '@published': maybe
+  '@sort': 1
+  home:
+    '@published': 'yes'
+    '@locales': nl_NL
+    '@source': [a]
+    '@unknown': 1
+  about:
+    '@locales':
+      nl_NL: Thuis
+Member: not-a-map

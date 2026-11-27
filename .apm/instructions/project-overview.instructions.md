@@ -15,6 +15,7 @@ Package: `wedevelopnl/silverstripe-fixtures` (type: `silverstripe-vendormodule`)
 src/                  # PHP source (PSR-4: WeDevelop\Fixtures\)
 tests/Unit/           # Unit tests, no database or framework (WeDevelop\Fixtures\Tests\)
 tests/Integration/    # Integration tests, full SilverStripe environment
+tests/Benchmark/      # Benchmark against core fixtures; `task benchmark` only, never the default run
 .docker/              # Test harness: FrankenPHP + MySQL testbeds, the module mounted at /module
 .docker/app/          # Harness app: composer files + locks, phpunit/phpstan/rector config (baked into the image)
 .apm/instructions/    # Source of CLAUDE.md / AGENTS.md / GEMINI.md — edit here, then run `apm compile`
@@ -26,3 +27,5 @@ tests/Integration/    # Integration tests, full SilverStripe environment
 - Optional integrations (Versioned, Fluent) are `suggest`, never `require`: the base testbed installs the framework alone and must keep passing.
 - `silverstripe/assets` is always installed — `silverstripe/framework` requires it.
 - Keep every QA gate strict (PHPStan level max, 100% type coverage, 90% line coverage); never loosen one to get a build green.
+- Test models never declare Versioned/Fluent in their own `$extensions` — the base testbed resolves every model's config and lacks those classes; add them through the test's `$required_extensions` (or config merged in `setUpBeforeClass` when constructor arguments matter).
+- Loaded rows must equal `write()`'s rows: extend `tests/Integration/CompatibilityTest.php` for every new column or relation shape the loader handles.

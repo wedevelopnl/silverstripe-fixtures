@@ -1,0 +1,7 @@
+SilverStripe\Security\Group:
+  editors:
+    Title: Fixture editors
+    Code: fixtures-two-process-editors
+  authors:
+    Title: Fixture authors
+    Code: fixtures-two-process-authors

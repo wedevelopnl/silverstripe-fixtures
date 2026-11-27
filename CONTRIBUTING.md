@@ -32,8 +32,13 @@ The base testbed proves the module works without its optional integrations; the 
 | `task test-modules` | All PHP tests in the optional-modules testbed |
 | `task coverage` | All tests with coverage, HTML and Clover in `coverage/` |
 | `task coverage-check` | Fail below 90% line coverage |
+| `task benchmark` | Compare loading and clearing with the framework's fixture handling; report in `coverage/benchmark.md` |
 
-Tests live under `tests/Unit` and `tests/Integration`, namespace `WeDevelop\Fixtures\Tests`.
+Tests live under `tests/Unit` and `tests/Integration`, namespace `WeDevelop\Fixtures\Tests`; the benchmark under `tests/Benchmark` runs only through `task benchmark`.
+
+The harness project enables the package's test state (`.docker/app/_config/fixtures.yml`), so every test class with a `$fixture_file` loads it through the loader, as in a consuming project.
+
+Test models that need Versioned get it from the test that lists them (`$required_extensions`), never from their own `$extensions`: the base testbed resolves the config of every model while building its database, and Versioned is not installed there.
 
 ## Static analysis
 
@@ -45,7 +50,7 @@ Tests live under `tests/Unit` and `tests/Integration`, namespace `WeDevelop\Fixt
 | `task class-leak` | Classes in `src/` that nothing references |
 | `task qa` | Every check above plus both test runs, in parallel |
 
-The tool configuration lives in `.docker/app/` and is baked into the image: after changing it, rebuild with `task build`.
+The analysers run in the optional-modules testbed: `src/` uses Versioned and Fluent behind installed-checks, and they need those classes to resolve. The tool configuration lives in `.docker/app/` and is baked into the image: after changing it, rebuild with `task build`.
 
 ## Harness dependencies
 
@@ -53,4 +58,4 @@ The testbeds install from committed locks (`.docker/app/composer.lock`, `.docker
 
 ## Continuous integration
 
-GitHub Actions (`.github/workflows/ci.yml`) runs static analysis once, and the PHP suites on PHP 8.3, 8.4 and 8.5 in both testbeds.
+GitHub Actions (`.github/workflows/ci.yml`) runs static analysis once, the PHP suites on PHP 8.3, 8.4 and 8.5 in both testbeds, and the benchmark, whose report it adds to the job summary and uploads as an artifact. The benchmark has no threshold and never fails on timings.

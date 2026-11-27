@@ -1,0 +1,100 @@
+<?php
+
+declare(strict_types=1);
+
+namespace WeDevelop\Fixtures\Load;
+
+use SilverStripe\ORM\DataObject;
+
+/**
+ * The rows one load inserts, the IDs it assigned and the ID range it claimed per table.
+ */
+final class Plan
+{
+    /**
+     * @var array<string, list<array<string, mixed>>>
+     */
+    private array $rows = [];
+
+    /**
+     * @var array<string, array{int, int}>
+     */
+    private array $ranges = [];
+
+    /**
+     * @var array<string, int> record ID by reference name
+     */
+    private array $ids = [];
+
+    /**
+     * @var array<string, class-string<DataObject>> record class by reference name
+     */
+    private array $classes = [];
+
+    /**
+     * Claims the next ID of a table with its own ID sequence; the first claim starts above the floor.
+     *
+     * @param callable(): int $floor
+     */
+    public function claim(string $table, callable $floor): int
+    {
+        $id = ($this->ranges[$table][1] ?? $floor()) + 1;
+        $this->ranges[$table] = [$this->ranges[$table][0] ?? $id, $id];
+
+        return $id;
+    }
+
+    /**
+     * @param class-string<DataObject> $class
+     */
+    public function assign(string $key, string $class, int $id): void
+    {
+        $this->ids[$key] = $id;
+        $this->classes[$key] = $class;
+    }
+
+    public function idOf(string $key): int
+    {
+        return $this->ids[$key];
+    }
+
+    /**
+     * @return class-string<DataObject>
+     */
+    public function classOf(string $key): string
+    {
+        return $this->classes[$key];
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     */
+    public function add(string $table, array $row): void
+    {
+        $this->rows[$table][] = $row;
+    }
+
+    /**
+     * @return array<string, list<array<string, mixed>>>
+     */
+    public function rows(): array
+    {
+        return $this->rows;
+    }
+
+    /**
+     * @return array<string, array{int, int}> first and last ID by table
+     */
+    public function ranges(): array
+    {
+        return $this->ranges;
+    }
+
+    /**
+     * @return list<class-string<DataObject>>
+     */
+    public function classes(): array
+    {
+        return array_values(array_unique($this->classes));
+    }
+}

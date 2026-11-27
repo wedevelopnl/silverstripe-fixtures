@@ -21,6 +21,9 @@
         "php": "^8.3",
         "silverstripe/framework": "^6.0"
     },
+    "suggest": {
+        "silverstripe/versioned": "Load records as published or draft-only with @published"
+    },
     "require-dev": {
         "cambis/silverstan": "^2.1",
         "phpstan/extension-installer": "^1.4",

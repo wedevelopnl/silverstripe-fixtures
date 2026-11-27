@@ -1,0 +1,13 @@
+Page:
+  '@published': true
+  home:
+    Title: Home
+    '@locales':
+      nl_NL: { Title: Thuis }
+  about:
+    Title: About us
+    '@published': false
+SilverStripe\Assets\Image:
+  logo:
+    Name: logo.png
+    '@source': 'wedevelopnl/silverstripe-fixtures:tests/files/logo.png'
