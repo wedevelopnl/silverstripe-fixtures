@@ -98,8 +98,11 @@ final class LedgerReset
         foreach (['parent', 'child'] as $side) {
             $base = $join[$side . 'Base'];
             $condition = $base === null ? null : $this->families[$base] ?? null;
-            if ($condition !== null && !$condition->isEmpty()) {
-                [$sql, $sideParameters] = $condition->toSql($join[$side . 'Field']);
+            if ($condition === null || $condition->isEmpty()) {
+                continue;
+            }
+
+            foreach ($condition->toSql($join[$side . 'Field']) as $sql => $sideParameters) {
                 $clauses[] = $sql;
                 $parameters = [...$parameters, ...$sideParameters];
             }
@@ -123,8 +126,9 @@ final class LedgerReset
 
             $reads[$baseTable] = [];
             foreach ($this->recordTables($baseTable) as $table => $column) {
-                [$sql, $parameters] = $condition->toSql($column);
-                $reads[$baseTable][] = [sprintf('SELECT DISTINCT "ClassName" FROM "%s" WHERE %s', $table, $sql), $parameters];
+                foreach ($condition->toSql($column) as $sql => $parameters) {
+                    $reads[$baseTable][] = [sprintf('SELECT DISTINCT "ClassName" FROM "%s" WHERE %s', $table, $sql), $parameters];
+                }
             }
         }
 
@@ -158,13 +162,13 @@ final class LedgerReset
 
             foreach (array_unique($tables) as $table) {
                 foreach ($this->existing($table, array_keys(self::SUFFIXES)) as $suffixed => $column) {
-                    $deletes[] = [$suffixed, $this->where($condition, $column)];
+                    $deletes[] = [$suffixed, $condition->toSql($column)];
                 }
             }
         }
 
         foreach ($this->joinTables as $table => $condition) {
-            $deletes[] = [$table, $this->where($condition, 'ID')];
+            $deletes[] = [$table, $condition->toSql('ID')];
         }
 
         foreach ($joins as $join) {
@@ -180,16 +184,6 @@ final class LedgerReset
     private function family(string $baseTable): Condition
     {
         return $this->families[$baseTable] ??= new Condition();
-    }
-
-    /**
-     * @return array<string, list<int>>
-     */
-    private function where(Condition $condition, string $column): array
-    {
-        [$sql, $parameters] = $condition->toSql($column);
-
-        return [$sql => $parameters];
     }
 
     /**

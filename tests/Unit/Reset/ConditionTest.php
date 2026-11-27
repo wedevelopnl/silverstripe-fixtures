@@ -26,7 +26,7 @@ final class ConditionTest extends TestCase
 
         $this->assertFalse($condition->isEmpty());
         $this->assertSame(
-            ['("ID" BETWEEN ? AND ? OR "ID" BETWEEN ? AND ? OR "ID" IN (?, ?, ?))', [1, 5, 20, 21, 9, 12, 15]],
+            ['("ID" BETWEEN ? AND ? OR "ID" BETWEEN ? AND ? OR "ID" IN (?, ?, ?))' => [1, 5, 20, 21, 9, 12, 15]],
             $condition->toSql('ID'),
         );
     }
@@ -36,6 +36,6 @@ final class ConditionTest extends TestCase
         $condition = new Condition();
         $condition->addIds([3]);
 
-        $this->assertSame(['("RecordID" IN (?))', [3]], $condition->toSql('RecordID'));
+        $this->assertSame(['("RecordID" IN (?))' => [3]], $condition->toSql('RecordID'));
     }
 }
