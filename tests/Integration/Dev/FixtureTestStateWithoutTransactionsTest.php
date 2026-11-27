@@ -11,7 +11,7 @@ use WeDevelop\Fixtures\Tests\Integration\Model\Tag;
 
 /**
  * Without a test transaction the framework drops the temporary database after every test, and the next test
- * builds a new one and loads the fixture again, now through the package's loader.
+ * builds a new one and loads the fixture again. The trait checks that the package's loader did that load.
  */
 final class FixtureTestStateWithoutTransactionsTest extends SapphireTest
 {

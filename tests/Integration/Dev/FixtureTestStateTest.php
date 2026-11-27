@@ -14,7 +14,9 @@ use WeDevelop\Fixtures\Tests\Integration\Model\Tag;
 
 /**
  * A test class written for the framework's fixture handling, run with the package's state configured for the
- * project (the harness's app/_config/fixtures.yml). Only the last test looks behind the scenes.
+ * project (the harness's app/_config/fixtures.yml). The last test and the trait's look behind the scenes, at
+ * the state in use and the ledger only the package's loader writes; with transactions on, the trait's test also
+ * fails when the state loads the fixture again for every test.
  */
 final class FixtureTestStateTest extends SapphireTest
 {
