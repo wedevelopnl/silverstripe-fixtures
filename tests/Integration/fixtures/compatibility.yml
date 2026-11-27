@@ -1,8 +1,12 @@
 WeDevelop\Fixtures\Tests\Integration\Model\Tag:
   red:
     Title: Red
+    Plains:
+      - =>WeDevelop\Fixtures\Tests\Integration\Model\Plain.root
   blue:
     Title: Blue
+    Plains:
+      - =>WeDevelop\Fixtures\Tests\Integration\Model\Plain.child
 WeDevelop\Fixtures\Tests\Integration\Model\Plain:
   root:
     Title: Root
@@ -21,6 +25,9 @@ WeDevelop\Fixtures\Tests\Integration\Model\Plain:
       Amount: 3
       Currency: USD
     Parent: =>WeDevelop\Fixtures\Tests\Integration\Model\Plain.root
+    Tags:
+      - =>WeDevelop\Fixtures\Tests\Integration\Model\Tag.red
+      - =>WeDevelop\Fixtures\Tests\Integration\Model\Tag.red
     Related:
       - =>WeDevelop\Fixtures\Tests\Integration\Model\Plain.root
 WeDevelop\Fixtures\Tests\Integration\Model\Sub:

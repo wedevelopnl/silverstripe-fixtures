@@ -17,11 +17,24 @@ WeDevelop\Fixtures\Tests\Integration\Model\Plain:
     ParentID: =>WeDevelop\Fixtures\Tests\Integration\Model\Plain.broken
     Body: =>WeDevelop\Fixtures\Tests\Integration\Model\Tag.red
     '@published': true
+  twice:
+    Tags:
+      - ref: =>WeDevelop\Fixtures\Tests\Integration\Model\Tag.red
+        Weight: 1
+      - ref: =>WeDevelop\Fixtures\Tests\Integration\Model\Tag.red
+        Weight: 2
+      - ref: =>WeDevelop\Fixtures\Tests\Integration\Model\Tag.blue
+        Weight: 1
 WeDevelop\Fixtures\Tests\Integration\Model\Tag:
   red:
     Title: Red
     Plains:
       - =>WeDevelop\Fixtures\Tests\Integration\Model\Plain.missing
+  blue:
+    Title: Blue
+    Plains:
+      - ref: =>WeDevelop\Fixtures\Tests\Integration\Model\Plain.twice
+        Weight: 2
 Unknown\Kind:
   thing:
     Title: Thing

@@ -206,12 +206,17 @@ final readonly class RowPlanner
         $extraFields = $schema->manyManyExtraFieldsForComponent($class, $field) ?? [];
         $table = $component['join'];
         foreach ($items as $item) {
-            $extras = is_array($item) ? array_diff_key($item, ['ref' => true]) : [];
-            $row = [
-                'ID' => $plan->claim($table, fn (): int => $this->floor([$table => 'ID'])),
+            $sides = [
                 $component['parentField'] => $id,
                 $component['childField'] => $plan->idOf((string) Reference::parse(is_array($item) ? $item['ref'] : $item)),
             ];
+            if (!$plan->claimPair($table, $sides)) {
+                // Stated before with the same extra field values, as the validator ensures
+                continue;
+            }
+
+            $extras = is_array($item) ? array_diff_key($item, ['ref' => true]) : [];
+            $row = ['ID' => $plan->claim($table, fn (): int => $this->floor([$table => 'ID'])), ...$sides];
             foreach ($extras as $name => $value) {
                 $row = [...$row, ...ClassSchema::convert($extraFields[$name], (string) $name, $value)];
             }

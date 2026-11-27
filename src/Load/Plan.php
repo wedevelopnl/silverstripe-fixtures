@@ -27,6 +27,11 @@ final class Plan
     private array $ids = [];
 
     /**
+     * @var array<string, true> the join pairs planned, by join table and pair
+     */
+    private array $pairs = [];
+
+    /**
      * @var array<string, class-string<DataObject>> record class by reference name
      */
     private array $classes = [];
@@ -64,6 +69,25 @@ final class Plan
     public function classOf(string $key): string
     {
         return $this->classes[$key];
+    }
+
+    /**
+     * Claims a pair of records in a join table; false when the load already holds it, as write() keeps one row per
+     * pair.
+     *
+     * @param array<string, int> $sides record ID by join column
+     */
+    public function claimPair(string $table, array $sides): bool
+    {
+        ksort($sides);
+        $pair = serialize([$table, $sides]);
+        if (isset($this->pairs[$pair])) {
+            return false;
+        }
+
+        $this->pairs[$pair] = true;
+
+        return true;
     }
 
     /**
