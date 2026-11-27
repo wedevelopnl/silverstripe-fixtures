@@ -13,6 +13,7 @@ use SilverStripe\ORM\FieldType\DBDatetime;
 use SilverStripe\Versioned\Versioned;
 use TractorCow\Fluent\Extension\FluentExtension;
 use TractorCow\Fluent\Extension\FluentVersionedExtension;
+use TractorCow\Fluent\Model\Domain;
 use TractorCow\Fluent\Model\Locale;
 use TractorCow\Fluent\State\FluentState;
 use WeDevelop\Fixtures\FixtureLoader;
@@ -181,6 +182,20 @@ final class FluentFixtureTest extends SapphireTest
         FixtureLoader::singleton()->load(self::FIXTURES . 'locales.yml');
 
         $this->assertSame(['en_US', 'nl_NL', 'de_DE'], Locale::getCached()->column('Locale'));
+    }
+
+    public function testACachedDomainListHidesNeitherALoadNorAReset(): void
+    {
+        $this->requireFluent();
+        $this->assertSame([], Domain::getCached()->column('Domain'), 'the cached list starts empty');
+
+        FixtureLoader::singleton()->load(self::FIXTURES . 'domains.yml');
+
+        $this->assertSame(['www.example.com'], Domain::getCached()->column('Domain'), 'the load flushed the cache');
+
+        FixtureLoader::singleton()->reset();
+
+        $this->assertSame([], Domain::getCached()->column('Domain'), 'the reset flushed the cache');
     }
 
     public function testACachedLocaleListHidesNeitherALoadNorAReset(): void
