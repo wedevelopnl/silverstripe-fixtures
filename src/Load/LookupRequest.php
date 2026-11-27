@@ -21,9 +21,4 @@ final readonly class LookupRequest
         public array $sources,
     ) {
     }
-
-    public function isEmpty(): bool
-    {
-        return !$this->locales && $this->files === [] && $this->sources === [];
-    }
 }
