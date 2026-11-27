@@ -337,7 +337,7 @@ final class ValidatorTest extends TestCase
             $this->record('Unknown\Kind', 'thing', ['Name' => 'x.txt']),
         ]);
 
-        $this->assertEquals(new LookupRequest(false, [], []), $request);
+        $this->assertSame([false, [], []], [$request->locales, $request->files, $request->sources]);
     }
 
     public function testTheLookupsNamedAreTheLocalesThePlacesOfPlainNamedFilesAndTheSources(): void
@@ -351,7 +351,10 @@ final class ValidatorTest extends TestCase
 
         $request = $this->validator()->needs($records);
 
-        $this->assertEquals(new LookupRequest(true, [['uploads', 0], ['logo.png', 7]], ['/files/logo.png']), $request);
+        $this->assertSame(
+            [true, [['uploads', 0], ['logo.png', 7]], ['/files/logo.png']],
+            [$request->locales, $request->files, $request->sources],
+        );
         $this->assertFalse((new Validator($this->schemas(), false))->needs($records)->locales, 'without the translation module');
     }
 
