@@ -205,7 +205,8 @@ final readonly class RowPlanner
         $values['ClassName'] = $schema->class;
         unset($specs['ClassName']);
         foreach (['Created', 'LastEdited'] as $column) {
-            if (!isset($values[$column])) {
+            // A value DBDatetime stores as NULL (DBDate::parseDate()) takes the load's time
+            if (empty($values[$column]) && !is_numeric($values[$column] ?? null)) {
                 $values[$column] = $now;
                 unset($specs[$column]);
             }

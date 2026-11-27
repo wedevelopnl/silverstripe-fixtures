@@ -6,6 +6,7 @@ namespace WeDevelop\Fixtures\Tests\Unit\Load;
 
 use LogicException;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use WeDevelop\Fixtures\FixtureLedger;
 use WeDevelop\Fixtures\Load\FixtureRecord;
@@ -69,6 +70,26 @@ final class RowPlannerTest extends TestCase
             $plan->rows()['Tag'][0],
         );
         $this->assertSame([['Created' => 'DBDatetime'], null], $plan->conversions()['Tag'][0]);
+    }
+
+    /**
+     * @return iterable<string, array{mixed, mixed}>
+     */
+    public static function emptyTimestamps(): iterable
+    {
+        yield 'an empty string' => ['', self::NOW];
+        yield 'false' => [false, self::NOW];
+        yield 'a zero timestamp, which DBDatetime stores as 1970' => [0, 0];
+        yield 'a zero timestamp as a string' => ['0', '0'];
+    }
+
+    #[DataProvider('emptyTimestamps')]
+    public function testAStatedCreatedOrLastEditedThatDbDatetimeStoresAsNullTakesTheLoadsTime(mixed $stated, mixed $planned): void
+    {
+        $plan = $this->plan([$this->record('App\Tag', 'red', ['Created' => $stated, 'LastEdited' => $stated])]);
+
+        $row = $plan->rows()['Tag'][0];
+        $this->assertSame([$planned, $planned], [$row['Created'], $row['LastEdited']]);
     }
 
     public function testAHasOneHoldsTheReferencedIdAndAPolymorphicOneAlsoItsClass(): void
