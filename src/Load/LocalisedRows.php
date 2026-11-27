@@ -41,8 +41,7 @@ final class LocalisedRows
     private static function addRow(Plan $plan, ClassSchema $schema, string $table, array $row, bool $published): void
     {
         $plan->add($table, $row);
-        // A versioned class carries FluentVersionedExtension, which keeps stage and version tables per locale
-        if ($schema->versioned) {
+        if ($schema->localisedStages) {
             $plan->add($table . '_Versions', [...$row, 'Version' => VersionedRows::VERSION]);
             if ($published) {
                 $plan->add($table . '_Live', $row);

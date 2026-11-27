@@ -20,6 +20,7 @@ use WeDevelop\Fixtures\InvalidFixtureException;
 use WeDevelop\Fixtures\LoadedFixtures;
 use WeDevelop\Fixtures\Tests\Integration\Model\LocalisedRecord;
 use WeDevelop\Fixtures\Tests\Integration\Model\LocalisedSub;
+use WeDevelop\Fixtures\Tests\Integration\Model\PlainFluentRecord;
 use WeDevelop\Fixtures\Tests\Integration\Model\Tag;
 
 final class FluentFixtureTest extends SapphireTest
@@ -34,10 +35,12 @@ final class FluentFixtureTest extends SapphireTest
         Tag::class,
         LocalisedRecord::class,
         LocalisedSub::class,
+        PlainFluentRecord::class,
     ];
 
     protected static $required_extensions = [
         LocalisedRecord::class => [Versioned::class, FluentVersionedExtension::class],
+        PlainFluentRecord::class => [Versioned::class, FluentExtension::class],
     ];
 
     public static function getExtraDataObjects(): array
@@ -129,6 +132,29 @@ final class FluentFixtureTest extends SapphireTest
         // The loader writes one version per locale: it is compared with the latest of write()'s
         $this->assertSame($this->latestVersionOnly($written)[0], $loadedRows);
         $this->assertSame([1], $loadedVersions);
+    }
+
+    public function testAVersionedClassWithPlainFluentGetsOnlyTheLocalisedRowsWriteLeaves(): void
+    {
+        $this->requireFluent();
+        $table = 'FixturesTest_PlainFluentRecord_Localised';
+        FixtureLoader::singleton()->load(self::FIXTURES . 'locales.yml');
+        DBDatetime::set_mock_now('2026-11-27 10:00:00');
+        $this->logOut();
+        $record = PlainFluentRecord::create();
+        $this->writeInLocale('en_US', $record, ['Title' => 'Home'], true);
+        $this->writeInLocale('nl_NL', $record, ['Title' => 'Thuis'], true);
+        $written = $this->snapshot([$table], ['home' => $record->ID]);
+        $this->emptyTables([$table]);
+
+        $loaded = FixtureLoader::singleton()->load(self::FIXTURES . 'plain-fluent.yml');
+
+        $this->assertCount(2, $written[$table]);
+        $this->assertSame($written, $this->snapshot([$table], ['home' => $loaded->idOf(PlainFluentRecord::class, 'home')]));
+        $this->assertTrue(PlainFluentRecord::get()->byID($record->ID)?->isPublished(), 'the record itself is published');
+        foreach (['_Live', '_Versions'] as $suffix) {
+            $this->assertFalse(DB::get_schema()->hasTable($table . $suffix), 'only FluentVersionedExtension localises ' . $suffix);
+        }
     }
 
     public function testAPageShowsEachLanguageWithItsOwnTitle(): void
@@ -267,7 +293,7 @@ final class FluentFixtureTest extends SapphireTest
     /**
      * @param array<string, mixed> $values
      */
-    private function writeInLocale(string $locale, LocalisedSub $record, array $values, bool $publish): void
+    private function writeInLocale(string $locale, LocalisedSub|PlainFluentRecord $record, array $values, bool $publish): void
     {
         FluentState::singleton()->withState(static function (FluentState $state) use ($locale, $record, $values, $publish): void {
             $state->setLocale($locale);

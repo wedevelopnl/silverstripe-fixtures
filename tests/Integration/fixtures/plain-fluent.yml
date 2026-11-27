@@ -1,0 +1,7 @@
+WeDevelop\Fixtures\Tests\Integration\Model\PlainFluentRecord:
+  home:
+    Title: Home
+    '@published': true
+    '@locales':
+      en_US: {}
+      nl_NL: { Title: Thuis }

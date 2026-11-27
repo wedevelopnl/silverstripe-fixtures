@@ -14,6 +14,7 @@ use SilverStripe\ORM\FieldType\DBField;
 use SilverStripe\ORM\ManyManyThroughList;
 use SilverStripe\Versioned\Versioned;
 use TractorCow\Fluent\Extension\FluentExtension;
+use TractorCow\Fluent\Extension\FluentVersionedExtension;
 
 /**
  * What write() would know about a class, read from the static schema without instantiating a record.
@@ -29,6 +30,8 @@ final readonly class ClassSchema
      * @param array<string, mixed> $defaults static defaults of columns and composites, leaf class first
      * @param array<string, list<string>>|null $localisedTables localised fields by table; null when the class is
      *                                                     not localised
+     * @param bool $localisedStages whether the localised tables have `_Live` and `_Versions` tables, which only
+     *                              FluentVersionedExtension adds
      */
     public function __construct(
         public string $class,
@@ -42,6 +45,7 @@ final readonly class ClassSchema
         public bool $staged,
         public bool $isFile,
         public ?array $localisedTables,
+        public bool $localisedStages,
     ) {
     }
 
@@ -80,6 +84,7 @@ final readonly class ClassSchema
             $versioned && self::hasStages($class),
             is_a($class, File::class, true),
             self::localisedTablesOf($class),
+            class_exists(FluentVersionedExtension::class) && $class::has_extension(FluentVersionedExtension::class),
         );
     }
 
