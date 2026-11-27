@@ -71,7 +71,7 @@ final class FixtureLoaderTest extends SapphireTest
                     $where . Plain::class . '.broken: "TitleLength" is a generated column and cannot be written',
                     $where . Plain::class . '.broken: refers to ' . Plain::class . '.missing, which no file of this load holds',
                     $where . Plain::class . '.broken: "Target" must be a reference like =>Class.identifier',
-                    $where . Plain::class . '.broken: "Tags" must be a list of references',
+                    $where . Plain::class . '.broken: "Tags" must be a list of references, like [=>Class.a, =>Class.b]',
                     $where . Plain::class . '.broken: "Related" has no extra field "Weight"',
                     $where . Plain::class . '.broken: "Links" is a many_many through; declare records of its join class instead',
                     $where . Plain::class . '.broken: "ParentID" cannot hold a reference; set the has_one instead: Parent: =>Class.identifier',
