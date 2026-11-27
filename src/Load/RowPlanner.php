@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace WeDevelop\Fixtures\Load;
 
 use LogicException;
+use SilverStripe\Assets\Folder;
 use SilverStripe\ORM\DataObject;
 use SilverStripe\ORM\DB;
 use SilverStripe\ORM\FieldType\DBDatetime;
@@ -21,6 +22,7 @@ final readonly class RowPlanner
     public function __construct(
         private SchemaMap $schemas,
         private VersionedRows $versionedRows = new VersionedRows(),
+        private FilePlacer $filePlacer = new FilePlacer(),
     ) {
     }
 
@@ -37,9 +39,10 @@ final readonly class RowPlanner
             $plan->assign($record->key(), $schema->class, $plan->claim($schema->baseTable, fn (): int => $this->floor($this->idSources($schema))));
         }
 
+        $files = $this->placeFiles($records, $schemas);
         $now = DBDatetime::now()->Rfc2822();
         foreach ($records as $record) {
-            $this->planRecord($plan, $record, $schemas[$record->key()], $now);
+            $this->planRecord($plan, $record, $schemas[$record->key()], $now, $files[$record->key()] ?? []);
         }
 
         foreach ($plan->ranges() as $table => [$first, $last]) {
@@ -64,11 +67,14 @@ final readonly class RowPlanner
         return $this->schemas->forClass($class);
     }
 
-    private function planRecord(Plan $plan, FixtureRecord $record, ClassSchema $schema, string $now): void
+    /**
+     * @param array<string, mixed> $fileValues the File field's columns, for a record with a source file
+     */
+    private function planRecord(Plan $plan, FixtureRecord $record, ClassSchema $schema, string $now, array $fileValues): void
     {
         $id = $plan->idOf($record->key());
         $rows = array_fill_keys($schema->tables, ['ID' => $id]);
-        foreach ($this->values($plan, $record, $schema, $now) as $column => $value) {
+        foreach ([...$this->values($plan, $record, $schema, $now), ...$fileValues] as $column => $value) {
             $rows[$schema->columnTables[$column]][$column] = $value;
         }
 
@@ -85,6 +91,61 @@ final readonly class RowPlanner
                 $this->planJoinRows($plan, $schema->class, $field, $id, $value);
             }
         }
+    }
+
+    /**
+     * Places the source files before anything is written; a failed load leaves them in the store, as a reset
+     * leaves files alone.
+     *
+     * @param list<FixtureRecord> $records
+     * @param array<string, ClassSchema> $schemas by reference name
+     *
+     * @return array<string, array<string, mixed>> the File field's columns by reference name
+     */
+    private function placeFiles(array $records, array $schemas): array
+    {
+        $byKey = [];
+        foreach ($records as $record) {
+            $byKey[$record->key()] = $record;
+        }
+
+        $files = [];
+        foreach ($records as $record) {
+            if ($record->source === null) {
+                continue;
+            }
+
+            $schema = $schemas[$record->key()];
+            $placed = $this->filePlacer->place(
+                (string) PathResolver::resolve($record->source),
+                $this->filename($record, $byKey),
+                // Without stages a file is as public as its record, as AssetControlExtension has it
+                $record->published === true || !$schema->staged,
+            );
+            $files[$record->key()] = $schema->columnValues('File', $placed);
+        }
+
+        return $files;
+    }
+
+    /**
+     * The record's path in the asset store: its parent folders' names and its own.
+     *
+     * @param array<string, FixtureRecord> $byKey
+     */
+    private function filename(FixtureRecord $record, array $byKey): string
+    {
+        $name = $record->fields['Name'] ?? '';
+        $name = is_scalar($name) ? (string) $name : '';
+        $parent = Reference::parse($record->fields['Parent'] ?? null);
+        if ($parent !== null) {
+            return $this->filename($byKey[$parent], $byKey) . '/' . $name;
+        }
+
+        $parentId = $record->fields['ParentID'] ?? 0;
+        $folder = is_numeric($parentId) && $parentId > 0 ? Folder::get()->byID((int) $parentId) : null;
+
+        return ($folder?->getFilename() ?? '') . $name;
     }
 
     /**

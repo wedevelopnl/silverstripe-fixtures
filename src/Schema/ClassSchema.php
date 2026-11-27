@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace WeDevelop\Fixtures\Schema;
 
+use SilverStripe\Assets\File;
 use SilverStripe\Core\ClassInfo;
 use SilverStripe\Core\Config\Config;
 use SilverStripe\Core\Injector\Injector;
@@ -36,6 +37,7 @@ final readonly class ClassSchema
         public array $defaults,
         public bool $versioned,
         public bool $staged,
+        public bool $isFile,
     ) {
     }
 
@@ -72,6 +74,7 @@ final readonly class ClassSchema
             self::defaultsOf($class, $specs),
             $versioned,
             $versioned && self::hasStages($class),
+            is_a($class, File::class, true),
         );
     }
 

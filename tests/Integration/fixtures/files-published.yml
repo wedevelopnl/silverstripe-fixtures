@@ -1,0 +1,23 @@
+SilverStripe\Assets\Folder:
+  fixture_files:
+    Name: fixture-files
+    Title: fixture-files
+    '@published': true
+SilverStripe\Assets\Image:
+  logo:
+    Name: logo.png
+    Title: Logo
+    Parent: =>SilverStripe\Assets\Folder.fixture_files
+    '@source': 'wedevelopnl/silverstripe-fixtures:tests/files/logo.png'
+    '@published': true
+SilverStripe\Assets\File:
+  notes:
+    Name: notes.txt
+    Title: Notes
+    Parent: =>SilverStripe\Assets\Folder.fixture_files
+    '@source': 'wedevelopnl/silverstripe-fixtures:tests/files/notes.txt'
+    '@published': false
+WeDevelop\Fixtures\Tests\Integration\Model\Card:
+  card:
+    Title: Card
+    Image: =>SilverStripe\Assets\Image.logo

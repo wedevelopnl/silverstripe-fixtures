@@ -61,9 +61,33 @@ On a versioned class, `'@published': true` loads the record as published and `fa
 
 A loaded record has exactly one version: a published record is on draft and live and not modified, a draft-only record is on draft alone. Without `@published` a record is draft-only, as a plain `write()` leaves it. `@published` on a class that is not versioned, or `true` on a class versioned without stages, refuses the load.
 
+### Files
+
+A `File`, `Image` or `Folder` is a record like any other. `@source` names the file to put in the asset store for it:
+
+```yaml
+SilverStripe\Assets\Folder:
+  fixture_files:
+    Name: fixture-files
+    Title: fixture-files
+    '@published': true
+SilverStripe\Assets\Image:
+  logo:
+    Name: logo.png
+    Title: Logo
+    Parent: =>SilverStripe\Assets\Folder.fixture_files
+    '@source': 'app/tests/files/logo.png'
+    '@published': true
+```
+
+- The file goes through the asset store's own API under the record's folder path and `Name`; the record gets its hash and filename. `Name` is required with `@source`.
+- A published file is public, a draft-only file protected. Without Versioned a file has no stages and is public. A file an earlier load published and the fixture now declares draft-only is protected again.
+- Give the test data folders of its own: a file or folder at a name the site already has refuses the load.
+- `@source` on a class that is not a `File` refuses the load. Reset deletes the records, never the files on disk.
+
 ### Paths
 
-Name fixture files as a module resource (`vendor/module:path/to/file.yml`), as an absolute path, or relative to the project root.
+Name fixture files and sources as a module resource (`vendor/module:path/to/file.yml`), as an absolute path, or relative to the project root.
 
 ## Using it in SapphireTest
 

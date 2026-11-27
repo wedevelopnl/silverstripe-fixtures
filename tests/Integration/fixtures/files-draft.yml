@@ -1,0 +1,11 @@
+SilverStripe\Assets\Folder:
+  fixture_files:
+    Name: fixture-files
+    Title: fixture-files
+SilverStripe\Assets\Image:
+  logo:
+    Name: logo.png
+    Title: Logo
+    Parent: =>SilverStripe\Assets\Folder.fixture_files
+    '@source': 'wedevelopnl/silverstripe-fixtures:tests/files/logo.png'
+    '@published': false

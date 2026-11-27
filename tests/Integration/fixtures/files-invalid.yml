@@ -1,0 +1,15 @@
+SilverStripe\Assets\Folder:
+  uploads:
+    Name: Uploads
+    Title: Uploads
+SilverStripe\Assets\File:
+  missing:
+    Name: missing.txt
+    Parent: =>SilverStripe\Assets\Folder.uploads
+    '@source': 'wedevelopnl/silverstripe-fixtures:tests/files/missing.txt'
+  nameless:
+    '@source': 'wedevelopnl/silverstripe-fixtures:tests/files/notes.txt'
+WeDevelop\Fixtures\Tests\Integration\Model\Tag:
+  red:
+    Title: Red
+    '@source': 'wedevelopnl/silverstripe-fixtures:tests/files/notes.txt'
