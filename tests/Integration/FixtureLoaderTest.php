@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace WeDevelop\Fixtures\Tests\Integration;
 
+use LogicException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use SilverStripe\Control\Director;
 use SilverStripe\Core\Config\Config;
@@ -249,6 +250,19 @@ final class FixtureLoaderTest extends SapphireTest
 
         $latitude = static fn (string $key): float => (float) Coordinate::get()->byID($loaded->idOf(Coordinate::class, $key))?->Latitude;
         $this->assertSame([52.37022216671234, 52.370222166712], [$latitude('precise'), $latitude('rounded')]);
+    }
+
+    public function testAManyManyTheFrameworkCannotResolveFailsOnlyALoadThatUsesIt(): void
+    {
+        Config::modify()->merge(Tag::class, 'belongs_many_many', ['Ghosts' => 'App\\Missing']);
+
+        $loaded = FixtureLoader::singleton()->load(self::FIXTURES . 'tags.yml');
+        $this->assertSame(['red', 'blue'], array_keys($loaded->toArray()[Tag::class]));
+
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('belongs_many_many relation ' . Tag::class . '.Ghosts points to App\\Missing which does not exist');
+
+        FixtureLoader::singleton()->load(self::FIXTURES . 'broken-relation.yml');
     }
 
     public function testResetRemovesTheLoadedRecordsAndTheConfiguredClassesOnly(): void

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace WeDevelop\Fixtures\Tests\Unit\Schema;
 
+use LogicException;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -42,5 +43,22 @@ final class ClassSchemaTest extends TestCase
         );
 
         $this->assertSame($kind, $schema->kind($key));
+    }
+
+    public function testAManyManyTheFrameworkCannotResolveRaisesItsErrorOnlyForTheKeyThatNamesIt(): void
+    {
+        $error = new LogicException('belongs_many_many relation App\Tag.Ghosts points to App\Missing which does not exist');
+        $schema = ClassSchemas::of(
+            'App\Tag',
+            'Tag',
+            fields: ['Title' => 'Varchar'],
+            kinds: ['Parent' => FieldKind::HasOne],
+            unresolvable: ['Ghosts' => $error, 'Parent' => new LogicException('shadowed by the has_one')],
+        );
+
+        $this->assertSame([FieldKind::Value, FieldKind::HasOne], [$schema->kind('Title'), $schema->kind('Parent')]);
+        $this->expectExceptionObject($error);
+
+        $schema->kind('Ghosts');
     }
 }

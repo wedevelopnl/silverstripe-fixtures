@@ -1,0 +1,5 @@
+WeDevelop\Fixtures\Tests\Integration\Model\Tag:
+  haunted:
+    Title: Haunted
+    Ghosts:
+      - =>WeDevelop\Fixtures\Tests\Integration\Model\Tag.haunted

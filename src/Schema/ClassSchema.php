@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace WeDevelop\Fixtures\Schema;
 
+use LogicException;
 use SilverStripe\Assets\File;
 use SilverStripe\Core\ClassInfo;
 use SilverStripe\Core\Config\Config;
@@ -29,6 +30,8 @@ final readonly class ClassSchema
      * @param array<string, array{join: string, parentField: string, childField: string, extraFields: array<string, string>}> $joins
      *                                                     the join table, its columns and the extra field
      *                                                     specifications of every many_many that is no through
+     * @param array<string, LogicException> $unresolvable the framework's error for every declared many_many it cannot
+     *                                                    resolve, raised only when a key names it
      * @param array<string, mixed> $defaults static defaults of columns and composites, leaf class first
      * @param bool $isLocale whether the class is Fluent's Locale, whose records add the locale codes a load knows
      * @param array<string, list<string>>|null $localisedTables localised columns by table; null when the class is
@@ -44,6 +47,7 @@ final readonly class ClassSchema
         public array $specs,
         private array $kinds,
         public array $joins,
+        private array $unresolvable,
         public array $defaults,
         public bool $versioned,
         public bool $staged,
@@ -75,7 +79,7 @@ final readonly class ClassSchema
         /** @var array<string, string> $specs */
         $specs = array_merge($schema->databaseFields($class), $schema->compositeFields($class));
         $versioned = class_exists(Versioned::class) && $class::has_extension(Versioned::class);
-        [$kinds, $joins] = self::relationsOf($class, $versioned);
+        [$kinds, $joins, $unresolvable] = self::relationsOf($class, $versioned);
 
         return new self(
             $class,
@@ -85,6 +89,7 @@ final readonly class ClassSchema
             $specs,
             $kinds,
             $joins,
+            $unresolvable,
             self::defaultsOf($class, $specs),
             $versioned,
             $versioned && self::hasStages($class),
@@ -97,17 +102,25 @@ final readonly class ClassSchema
 
     public function kind(string $key): FieldKind
     {
-        return $this->kinds[$key]
-            ?? (isset($this->fieldTables[$key]) || isset($this->specs[$key]) ? FieldKind::Value : FieldKind::Unknown);
+        if (isset($this->kinds[$key])) {
+            return $this->kinds[$key];
+        }
+
+        if (isset($this->unresolvable[$key])) {
+            throw $this->unresolvable[$key];
+        }
+
+        return isset($this->fieldTables[$key]) || isset($this->specs[$key]) ? FieldKind::Value : FieldKind::Unknown;
     }
 
     /**
-     * The kind of every key that is no plain value, in the order kind() has always answered them: the fixed and
-     * generated columns, then has_one, has_many and belongs_to, then many_many.
+     * The kind of every key that is no plain value, the first that claims a name winning: the fixed and generated
+     * columns, then has_one, has_many and belongs_to, then many_many. The framework resolves a many_many only when it
+     * is used, so one it cannot resolve keeps its error for the key that names it instead of failing the class.
      *
      * @param class-string<DataObject> $class
      *
-     * @return array{array<string, FieldKind>, array<string, array{join: string, parentField: string, childField: string, extraFields: array<string, string>}>}
+     * @return array{array<string, FieldKind>, array<string, array{join: string, parentField: string, childField: string, extraFields: array<string, string>}>, array<string, LogicException>}
      */
     private static function relationsOf(string $class, bool $versioned): array
     {
@@ -121,9 +134,16 @@ final readonly class ClassSchema
         $kinds += array_fill_keys(self::configKeys($class, 'has_one'), FieldKind::HasOne);
         $kinds += array_fill_keys([...self::configKeys($class, 'has_many'), ...self::configKeys($class, 'belongs_to')], FieldKind::HasMany);
         $joins = [];
+        $unresolvable = [];
         foreach ([...self::configKeys($class, 'many_many'), ...self::configKeys($class, 'belongs_many_many')] as $name) {
-            /** @var array{relationClass: string, join: string, parentField: string, childField: string} $component declared */
-            $component = $schema->manyManyComponent($class, $name);
+            try {
+                /** @var array{relationClass: string, join: string, parentField: string, childField: string} $component declared */
+                $component = $schema->manyManyComponent($class, $name);
+            } catch (LogicException $exception) {
+                $unresolvable[$name] = $exception;
+                continue;
+            }
+
             $through = $component['relationClass'] === ManyManyThroughList::class;
             $kinds += [$name => $through ? FieldKind::ManyManyThrough : FieldKind::ManyMany];
             if (!$through) {
@@ -138,7 +158,7 @@ final readonly class ClassSchema
             }
         }
 
-        return [$kinds, $joins];
+        return [$kinds, $joins, $unresolvable];
     }
 
     /**

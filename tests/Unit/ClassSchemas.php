@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace WeDevelop\Fixtures\Tests\Unit;
 
+use LogicException;
 use SilverStripe\ORM\DataObject;
 use WeDevelop\Fixtures\Schema\ClassSchema;
 use WeDevelop\Fixtures\Schema\FieldKind;
@@ -20,6 +21,7 @@ final class ClassSchemas
      * @param array<string, string> $fieldTables table of a field outside the base table
      * @param array<string, FieldKind> $kinds kind of every key that is no plain value besides ID and ClassName
      * @param array<string, array{join: string, parentField: string, childField: string, extraFields: array<string, string>}> $joins
+     * @param array<string, LogicException> $unresolvable
      * @param array<string, mixed> $defaults
      * @param list<string> $tables the class's tables below the base table
      * @param array<string, list<string>>|null $localisedTables
@@ -31,6 +33,7 @@ final class ClassSchemas
         array $fieldTables = [],
         array $kinds = [],
         array $joins = [],
+        array $unresolvable = [],
         array $defaults = [],
         array $tables = [],
         bool $versioned = false,
@@ -55,6 +58,7 @@ final class ClassSchemas
             $fields,
             $kinds,
             $joins,
+            $unresolvable,
             $defaults,
             $versioned,
             $staged,
