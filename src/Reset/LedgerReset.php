@@ -5,17 +5,19 @@ declare(strict_types=1);
 namespace WeDevelop\Fixtures\Reset;
 
 use SilverStripe\Core\ClassInfo;
+use SilverStripe\Core\Config\Config;
 use SilverStripe\ORM\DataObject;
 use SilverStripe\ORM\DataObjectSchema;
 use SilverStripe\ORM\DB;
+use SilverStripe\ORM\ManyManyThroughList;
 use SilverStripe\ORM\Queries\SQLDelete;
 use SilverStripe\ORM\Queries\SQLSelect;
 use WeDevelop\Fixtures\FixtureLedger;
 
 /**
  * Deletes the records the ledger holds and the records of the configured classes, from every table of their
- * chain, stages, versions and localised tables, then empties the ledger. DML only: a schema statement would end
- * an open test transaction.
+ * chain, stages, versions and localised tables, with the many_many join rows and join records that point at them,
+ * then empties the ledger. DML only: a schema statement would end an open test transaction.
  */
 final class LedgerReset
 {
@@ -73,6 +75,14 @@ final class LedgerReset
             $this->addResetClass($class);
         }
 
+        // Join records first: they are deleted as records, with their own chain
+        $joins = $this->joins();
+        foreach ($joins as $join) {
+            if ($join['relationClass'] === ManyManyThroughList::class) {
+                $this->addJoinRecords($join);
+            }
+        }
+
         $deleted = [];
         foreach ($this->families as $baseTable => $condition) {
             if (!$condition->isEmpty()) {
@@ -82,6 +92,13 @@ final class LedgerReset
 
         foreach ($this->joinTables as $table => $condition) {
             $this->delete($table, 'ID', $condition);
+        }
+
+        foreach ($joins as $join) {
+            $references = $this->references($join);
+            if ($join['relationClass'] !== ManyManyThroughList::class && $references !== null && isset($this->tables[strtolower($join['join'])])) {
+                SQLDelete::create('"' . $join['join'] . '"')->addWhere($references)->execute();
+            }
         }
 
         SQLDelete::create('"' . $ledgerTable . '"')->execute();
@@ -115,6 +132,71 @@ final class LedgerReset
             )->column();
             ($this->families[$baseTable] ??= new Condition())->addIds(array_map(intval(...), $ids));
         }
+    }
+
+    /**
+     * Every many_many relation, once per join table or join class: a belongs_many_many shares its many_many's.
+     *
+     * @return list<array{relationClass: string, parentClass: class-string<DataObject>, childClass: class-string<DataObject>, parentField: string, childField: string, join: string}>
+     */
+    private function joins(): array
+    {
+        $joins = [];
+        foreach (ClassInfo::subclassesFor(DataObject::class, false) as $class) {
+            $manyMany = Config::inst()->get($class, 'many_many', Config::UNINHERITED);
+            foreach (array_keys(is_array($manyMany) ? $manyMany : []) as $name) {
+                /** @var array{relationClass: string, parentClass: class-string<DataObject>, childClass: class-string<DataObject>, parentField: string, childField: string, join: string} $join */
+                $join = $this->schema->manyManyComponent($class, (string) $name);
+                $joins[$join['join'] . '.' . $join['parentField'] . '.' . $join['childField']] = $join;
+            }
+        }
+
+        return array_values($joins);
+    }
+
+    /**
+     * Adds the records of a many_many through join class that point at a record this reset deletes.
+     *
+     * @param array{parentClass: class-string<DataObject>, childClass: class-string<DataObject>, parentField: string, childField: string, join: string} $join
+     */
+    private function addJoinRecords(array $join): void
+    {
+        $references = $this->references($join);
+        if ($references === null) {
+            return;
+        }
+
+        $baseTable = $this->schema->baseDataTable($join['join']);
+        foreach ($this->existing($baseTable, ['', '_Live', '_Versions']) as $table => $column) {
+            /** @var list<int|string> $ids */
+            $ids = SQLSelect::create('DISTINCT "' . $column . '"', '"' . $table . '"', $references)->execute()->column();
+            ($this->families[$baseTable] ??= new Condition())->addIds(array_map(intval(...), $ids));
+        }
+    }
+
+    /**
+     * The rows of a join that point at a record this reset deletes, on either side; null when it deletes no
+     * record of either side's class. A polymorphic side names no class to match the ID against, and is skipped.
+     *
+     * @param array{parentClass: class-string<DataObject>, childClass: class-string<DataObject>, parentField: string, childField: string} $join
+     *
+     * @return array<string, list<int>>|null a WHERE clause and its parameters
+     */
+    private function references(array $join): ?array
+    {
+        $clauses = [];
+        $parameters = [];
+        foreach (['parent', 'child'] as $side) {
+            $class = $join[$side . 'Class'];
+            $condition = $class === DataObject::class ? null : $this->families[$this->schema->baseDataTable($class)] ?? null;
+            if ($condition !== null && !$condition->isEmpty()) {
+                [$sql, $sideParameters] = $condition->toSql($join[$side . 'Field']);
+                $clauses[] = $sql;
+                $parameters = [...$parameters, ...$sideParameters];
+            }
+        }
+
+        return $clauses === [] ? null : [implode(' OR ', $clauses) => $parameters];
     }
 
     /**

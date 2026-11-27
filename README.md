@@ -164,7 +164,7 @@ The ledger lives in the database, so a load in one process and a reset in anothe
 
 ## Clearing test data
 
-`reset()` deletes every record loaded since the last reset, from all its tables: the class tables, live and version tables. It never empties whole tables, so records of a loaded class that the load did not write stay.
+`reset()` deletes every record loaded since the last reset, from all its tables: the class tables, live and version tables. It never empties whole tables, so records of a loaded class that the load did not write stay. It also deletes the many_many join rows, and the records of a many_many through join class, that point at a deleted record on either side, wherever they came from: a test that links a loaded record to one of the site's leaves no row behind.
 
 Records your tests create, through the CMS or the ORM, are cleared only when you name their class:
 
