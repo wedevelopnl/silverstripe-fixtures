@@ -12,14 +12,17 @@ use SilverStripe\ORM\DataObject;
 use SilverStripe\ORM\Connect\Database;
 use SilverStripe\ORM\DB;
 use SilverStripe\Versioned\RecursiveStagesService;
+use TractorCow\Fluent\Extension\FluentExtension;
 use TractorCow\Fluent\Model\Domain;
 use TractorCow\Fluent\Model\Locale;
 use WeDevelop\Fixtures\Load\FixtureReader;
-use WeDevelop\Fixtures\Load\RowPlanner;
+use WeDevelop\Fixtures\Load\LoadPlanner;
+use WeDevelop\Fixtures\Load\LookupFetcher;
 use WeDevelop\Fixtures\Load\RowWriter;
 use WeDevelop\Fixtures\Load\Validator;
 use WeDevelop\Fixtures\Reset\LedgerReset;
 use WeDevelop\Fixtures\Schema\SchemaMap;
+use WeDevelop\Fixtures\Schema\ValueConverter;
 
 /**
  * Loads fixture files straight into the database in one transaction, and clears what was loaded. The entry point
@@ -60,8 +63,10 @@ class FixtureLoader
         }
 
         $set = (new FixtureReader())->read($files);
-        $schemas = new SchemaMap();
-        $problems = [...$problems, ...$set->problems, ...(new Validator($schemas))->validate($set->records)];
+        $schemas = (new SchemaMap())->forRecords($set->records);
+        $validator = new Validator($schemas, class_exists(FluentExtension::class));
+        $lookups = (new LookupFetcher())->fetch($validator->needs($set->records));
+        $problems = [...$problems, ...$set->problems, ...$validator->problems($set->records, $lookups)];
         if ($problems !== []) {
             throw new InvalidFixtureException($problems);
         }
@@ -70,8 +75,9 @@ class FixtureLoader
             return new LoadedFixtures([]);
         }
 
-        $plan = (new RowPlanner($schemas))->plan($set->records);
-        $this->connection()->withTransaction(static fn () => (new RowWriter())->write($plan));
+        $plan = (new LoadPlanner($schemas))->plan($set->records);
+        $rows = (new ValueConverter())->rows($plan);
+        $this->connection()->withTransaction(static fn () => (new RowWriter())->write($rows));
         $this->flushCaches($plan->classes());
 
         $ids = [];

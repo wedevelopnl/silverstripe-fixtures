@@ -4,19 +4,13 @@ declare(strict_types=1);
 
 namespace WeDevelop\Fixtures\Load;
 
-use SilverStripe\Assets\File;
-use SilverStripe\Assets\Folder;
-use SilverStripe\ORM\DataObject;
-use SilverStripe\ORM\DB;
-use TractorCow\Fluent\Extension\FluentExtension;
-use TractorCow\Fluent\Model\Locale;
 use WeDevelop\Fixtures\Schema\ClassSchema;
 use WeDevelop\Fixtures\Schema\FieldKind;
-use WeDevelop\Fixtures\Schema\SchemaMap;
 
 /**
  * Owns the invariant that nothing is written from an invalid set: it lists every problem, each naming the file,
- * the record and the field.
+ * the record and the field. What only the site can answer it first names in a lookup request, then judges from
+ * the lookups.
  */
 final readonly class Validator
 {
@@ -26,16 +20,52 @@ final readonly class Validator
      */
     private const array FILE_PLACE = ['Name', 'ParentID', 'File', 'FileFilename', 'FileHash', 'FileVariant'];
 
-    public function __construct(private SchemaMap $schemas)
+    /**
+     * @param array<string, ClassSchema|null> $schemas by class as written, of every record: null for a class that
+     *                                                names no record class
+     * @param bool $translatable whether the translation module, tractorcow/silverstripe-fluent, is installed
+     */
+    public function __construct(private array $schemas, private bool $translatable)
     {
     }
 
     /**
+     * What the set needs looked up: nothing for a set without values per language, files or source files.
+     *
      * @param list<FixtureRecord> $records
+     */
+    public function needs(array $records): LookupRequest
+    {
+        $locales = false;
+        $files = [];
+        $sources = [];
+        foreach ($records as $record) {
+            $locales = $locales || $record->locales !== [];
+            $schema = $this->schemas[$record->class] ?? null;
+            if ($schema === null || !$schema->isFile) {
+                continue;
+            }
+
+            if ($record->source !== null) {
+                $sources[] = $record->source;
+            }
+
+            $name = $record->fields['Name'] ?? null;
+            if (is_string($name) && Reference::parse($record->fields['Parent'] ?? null) === null) {
+                $files[] = [$name, $this->parentId($record)];
+            }
+        }
+
+        return new LookupRequest($locales && $this->translatable, $files, $sources);
+    }
+
+    /**
+     * @param list<FixtureRecord> $records
+     * @param Lookups $lookups the answers to needs() for the same records
      *
      * @return list<string>
      */
-    public function validate(array $records): array
+    public function problems(array $records, Lookups $lookups): array
     {
         $keys = [];
         foreach ($records as $record) {
@@ -45,16 +75,15 @@ final readonly class Validator
         $problems = [];
         $places = [];
         $pairs = [];
-        $localeCodes = $this->localeCodes($records);
+        $localeCodes = $this->localeCodes($records, $lookups);
         foreach ($records as $record) {
-            $class = $this->schemas->resolve($record->class);
-            if ($class === null) {
+            $schema = $this->schemas[$record->class] ?? null;
+            if ($schema === null) {
                 $problems[] = sprintf('%s: unknown class "%s"', $record->label(), $record->class);
                 continue;
             }
 
-            $schema = $this->schemas->forClass($class);
-            $recordProblems = [...$this->recordProblems($record, $schema, $keys, $localeCodes), ...$this->joinPairProblems($record, $schema, $keys, $pairs)];
+            $recordProblems = [...$this->recordProblems($record, $schema, $keys, $localeCodes, $lookups), ...$this->joinPairProblems($record, $schema, $keys, $pairs)];
             if ($schema->isFile) {
                 $recordProblems = [...$recordProblems, ...$this->samePlaceProblems($record, $places), ...$this->parentCycleProblems($record, $keys)];
             }
@@ -73,7 +102,7 @@ final readonly class Validator
      *
      * @return list<string>
      */
-    private function recordProblems(FixtureRecord $record, ClassSchema $schema, array $keys, array $localeCodes): array
+    private function recordProblems(FixtureRecord $record, ClassSchema $schema, array $keys, array $localeCodes, Lookups $lookups): array
     {
         $problems = [];
         foreach ($record->fields as $field => $value) {
@@ -84,11 +113,11 @@ final readonly class Validator
         }
 
         if ($record->source !== null) {
-            $problems = [...$problems, ...$this->sourceProblems($record, $schema)];
+            $problems = [...$problems, ...$this->sourceProblems($record, $schema, $lookups)];
         }
 
         if ($schema->isFile) {
-            $problems = [...$problems, ...$this->existingFileProblems($record)];
+            $problems = [...$problems, ...$this->existingFileProblems($record, $lookups)];
         }
 
         if ($record->locales !== []) {
@@ -153,16 +182,11 @@ final readonly class Validator
      *
      * @return array<string, true>
      */
-    private function localeCodes(array $records): array
+    private function localeCodes(array $records, Lookups $lookups): array
     {
-        if (!class_exists(Locale::class) || array_filter($records, static fn (FixtureRecord $record): bool => $record->locales !== []) === []) {
-            return [];
-        }
-
-        $codes = Locale::get()->column('Locale');
+        $codes = $lookups->locales ?? [];
         foreach ($records as $record) {
-            $class = $this->schemas->resolve($record->class);
-            if ($class !== null && is_a($class, Locale::class, true)) {
+            if (($this->schemas[$record->class] ?? null)?->isLocale === true) {
                 $codes[] = $record->fields['Locale'] ?? null;
             }
         }
@@ -178,7 +202,7 @@ final readonly class Validator
     private function localeProblems(FixtureRecord $record, ClassSchema $schema, array $localeCodes): array
     {
         if ($schema->localisedTables === null) {
-            return [class_exists(FluentExtension::class)
+            return [$this->translatable
                 ? sprintf('"@locales": %s is not translated', $record->class)
                 : '"@locales": translations need the translation module, tractorcow/silverstripe-fluent'];
         }
@@ -205,14 +229,14 @@ final readonly class Validator
     /**
      * @return list<string>
      */
-    private function sourceProblems(FixtureRecord $record, ClassSchema $schema): array
+    private function sourceProblems(FixtureRecord $record, ClassSchema $schema, Lookups $lookups): array
     {
         if (!$schema->isFile) {
             return [sprintf('"@source": %s is not a file class', $record->class)];
         }
 
         $problems = [];
-        if (!is_file((string) $record->source)) {
+        if (!($lookups->sources[(string) $record->source] ?? false)) {
             $problems[] = sprintf('"@source": no file at %s', $record->source);
         }
 
@@ -229,7 +253,7 @@ final readonly class Validator
      *
      * @return list<string>
      */
-    private function existingFileProblems(FixtureRecord $record): array
+    private function existingFileProblems(FixtureRecord $record, Lookups $lookups): array
     {
         $name = $record->fields['Name'] ?? null;
         if (!is_string($name) || Reference::parse($record->fields['Parent'] ?? null) !== null) {
@@ -237,27 +261,23 @@ final readonly class Validator
             return [];
         }
 
-        $parentId = (int) (is_numeric($record->fields['ParentID'] ?? null) ? $record->fields['ParentID'] : 0);
-        $table = (string) DataObject::getSchema()->baseDataTable(File::class);
-        $tables = DB::table_list();
-        foreach ([$table, $table . '_Live'] as $stage) {
-            if (!isset($tables[strtolower($stage)])) {
-                continue;
-            }
-
-            $query = sprintf('SELECT COUNT(*) FROM "%s" WHERE "Name" = ? AND "ParentID" = ?', $stage);
-            if ((int) DB::prepared_query($query, [$name, $parentId])->value() > 0) {
-                $folder = $parentId > 0 ? Folder::get()->byID($parentId)?->getFilename() : '';
-
-                return [sprintf(
-                    'the site already has a file or folder "%s%s"; give the test data a folder of its own',
-                    $folder,
-                    $name,
-                )];
-            }
+        $parentId = $this->parentId($record);
+        if (!in_array($name, $lookups->existingFiles[$parentId] ?? [], true)) {
+            return [];
         }
 
-        return [];
+        return [sprintf(
+            'the site already has a file or folder "%s%s"; give the test data a folder of its own',
+            $lookups->folderNames[$parentId] ?? '',
+            $name,
+        )];
+    }
+
+    private function parentId(FixtureRecord $record): int
+    {
+        $parentId = $record->fields['ParentID'] ?? null;
+
+        return (int) (is_numeric($parentId) ? $parentId : 0);
     }
 
     /**
@@ -332,8 +352,7 @@ final readonly class Validator
                 continue;
             }
 
-            /** @var array{join: string, parentField: string, childField: string} $component validated as a many_many */
-            $component = DataObject::getSchema()->manyManyComponent($schema->class, $field);
+            $component = $schema->joins[$field];
             foreach ($items as $item) {
                 $reference = Reference::parse($item->reference);
                 if ($reference === null || !isset($keys[$reference])) {
@@ -364,7 +383,7 @@ final readonly class Validator
         return match ($schema->kind($field)) {
             FieldKind::Value => $this->valueProblem($schema, $field, $value),
             FieldKind::HasOne => $this->referenceProblem($field, $value, $keys),
-            FieldKind::ManyMany => $this->manyManyProblem($schema->class, $field, $value, $keys),
+            FieldKind::ManyMany => $this->manyManyProblem($schema, $field, $value, $keys),
             FieldKind::ManyManyThrough => sprintf('"%s" is a many_many through; declare records of its join class instead', $field),
             FieldKind::HasMany => sprintf('"%s" is set on the record that holds the has_one', $field),
             FieldKind::Generated => sprintf('"%s" is a generated column and cannot be written', $field),
@@ -410,17 +429,16 @@ final readonly class Validator
     }
 
     /**
-     * @param class-string<DataObject> $class
      * @param array<string, FixtureRecord> $keys
      */
-    private function manyManyProblem(string $class, string $field, mixed $value, array $keys): ?string
+    private function manyManyProblem(ClassSchema $schema, string $field, mixed $value, array $keys): ?string
     {
         $items = ManyManyItem::listOf($value);
         if ($items === null) {
             return sprintf('"%s" must be a list of references, like [=>Class.a, =>Class.b]', $field);
         }
 
-        $extraFields = DataObject::getSchema()->manyManyExtraFieldsForComponent($class, $field) ?? [];
+        $extraFields = $schema->joins[$field]['extraFields'];
         foreach ($items as $item) {
             $unknown = array_diff_key($item->extras, $extraFields);
             if ($unknown !== []) {

@@ -18,9 +18,13 @@ final class VersionedRows
     private const int DRAFT_CHANGE = 2;
 
     /**
-     * @param array<string, array<string, mixed>> $rows by table, each with the record's ID
-     * @param array<string, array<string, mixed>>|null $draftRows the rows with the record's draft values, as $rows;
-     *                                                       null when it has none
+     * @param array<string, array{array<string, mixed>, array<string, string>}> $rows by table: each row with the
+     *                                                                         record's ID, and the specs of its
+     *                                                                         raw values
+     * @param array<string, array{array<string, mixed>, array<string, string>}>|null $draftRows the rows with the
+     *                                                                                   record's draft values, as
+     *                                                                                   $rows; null when it has
+     *                                                                                   none
      */
     public static function add(Plan $plan, ClassSchema $schema, array $rows, bool $published, ?array $draftRows): void
     {
@@ -44,22 +48,25 @@ final class VersionedRows
     }
 
     /**
-     * @param array<string, array<string, mixed>> $rows
+     * @param array<string, array{array<string, mixed>, array<string, string>}> $rows
      */
     private static function addStage(Plan $plan, ClassSchema $schema, array $rows, string $suffix, int $version): void
     {
-        $rows[$schema->baseTable]['Version'] = $version;
-        foreach ($rows as $table => $row) {
-            $plan->add($table . $suffix, $row);
+        foreach ($rows as $table => [$row, $specs]) {
+            if ($table === $schema->baseTable) {
+                $row['Version'] = $version;
+            }
+
+            $plan->add($table . $suffix, $row, $specs);
         }
     }
 
     /**
-     * @param array<string, array<string, mixed>> $rows
+     * @param array<string, array{array<string, mixed>, array<string, string>}> $rows
      */
     private static function addVersion(Plan $plan, ClassSchema $schema, array $rows, int $version, bool $wasPublished): void
     {
-        foreach ($rows as $table => $row) {
+        foreach ($rows as $table => [$row, $specs]) {
             $versionRow = ['RecordID' => $row['ID'], ...array_diff_key($row, ['ID' => true]), 'Version' => $version];
             if ($table === $schema->baseTable) {
                 $versionRow = [
@@ -72,7 +79,7 @@ final class VersionedRows
                 ];
             }
 
-            $plan->add($table . '_Versions', $versionRow);
+            $plan->add($table . '_Versions', $versionRow, $specs);
         }
     }
 }

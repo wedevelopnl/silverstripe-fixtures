@@ -17,6 +17,13 @@ final class Plan
     private array $rows = [];
 
     /**
+     * @var array<string, array<int, array{array<string, string>, array<string, true>|null}>> the specs of a row's raw
+     *                                                                                   values and the columns it
+     *                                                                                   keeps, by table and row
+     */
+    private array $conversions = [];
+
+    /**
      * @var array<string, array{int, int}>
      */
     private array $ranges = [];
@@ -97,18 +104,32 @@ final class Plan
 
     /**
      * @param array<string, mixed> $row
+     * @param array<string, string> $specs the field specification of each raw value in the row, which converts to
+     *                                     the columns its field type writes
+     * @param array<string, true>|null $columns the only columns the row keeps once converted; null for all
      */
-    public function add(string $table, array $row): void
+    public function add(string $table, array $row, array $specs = [], ?array $columns = null): void
     {
         $this->rows[$table][] = $row;
+        if ($specs !== [] || $columns !== null) {
+            $this->conversions[$table][array_key_last($this->rows[$table])] = [$specs, $columns];
+        }
     }
 
     /**
-     * @return array<string, list<array<string, mixed>>>
+     * @return array<string, list<array<string, mixed>>> by table, with raw values
      */
     public function rows(): array
     {
         return $this->rows;
+    }
+
+    /**
+     * @return array<string, array<int, array{array<string, string>, array<string, true>|null}>> by table and row
+     */
+    public function conversions(): array
+    {
+        return $this->conversions;
     }
 
     /**
