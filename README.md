@@ -88,7 +88,8 @@ Page:
 - A translated field the locale leaves out takes the record's value; fields Fluent does not translate are shared by every locale.
 - `@published` applies to every stated locale.
 - Only translated fields are allowed. `@locales` on a class Fluent does not translate, or without Fluent installed, refuses the load.
-- Load your `TractorCow\Fluent\Model\Locale` records as fixture data too, in the same load or an earlier one.
+- Each locale code must name a `TractorCow\Fluent\Model\Locale`, spelled exactly as its `Locale` field: load those records as fixture data too, in the same load or an earlier one, or have them in the database. An unknown code refuses the load.
+- Live and version rows per locale are written only for a class with `FluentVersionedExtension`, as Fluent does; a versioned class with the plain `FluentExtension` gets its `_Localised` rows only.
 
 ### Files
 
@@ -164,7 +165,7 @@ The ledger lives in the database, so a load in one process and a reset in anothe
 
 ## Clearing test data
 
-`reset()` deletes every record loaded since the last reset, from all its tables: the class tables, live and version tables. It never empties whole tables, so records of a loaded class that the load did not write stay. It also deletes the many_many join rows, and the records of a many_many through join class, that point at a deleted record on either side, wherever they came from: a test that links a loaded record to one of the site's leaves no row behind.
+`reset()` deletes every record loaded since the last reset, from all its tables: the class tables and their live, version and localised tables. It never empties whole tables, so records of a loaded class that the load did not write stay. It also deletes the many_many join rows, and the records of a many_many through join class, that point at a deleted record on either side, wherever they came from: a test that links a loaded record to one of the site's leaves no row behind.
 
 Records your tests create, through the CMS or the ORM, are cleared only when you name their class:
 
