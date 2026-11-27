@@ -137,8 +137,22 @@ final class FixtureLoaderTest extends SapphireTest
 
         $loaded = FixtureLoader::singleton()->load(self::FIXTURES . 'tags.yml');
 
-        $this->assertSame(501, $loaded->idOf(Tag::class, 'red'));
-        $this->assertSame(502, $loaded->idOf(Tag::class, 'blue'));
+        // Above, not at, 501: the auto-increment counter may be higher still, as a rollback does not lower it
+        $this->assertGreaterThan(500, $loaded->idOf(Tag::class, 'red'));
+        $this->assertSame($loaded->idOf(Tag::class, 'red') + 1, $loaded->idOf(Tag::class, 'blue'));
+    }
+
+    public function testALoadAfterAResetNeverHandsOutAnIdAgain(): void
+    {
+        $first = FixtureLoader::singleton()->load(self::FIXTURES . 'tags.yml', self::FIXTURES . 'plains.yml');
+        $firstJoinRow = $this->ledgerFirstId('FixturesTest_Plain_Tags');
+        FixtureLoader::singleton()->reset();
+
+        $second = FixtureLoader::singleton()->load(self::FIXTURES . 'tags.yml', self::FIXTURES . 'plains.yml');
+
+        $this->assertGreaterThan($first->idOf(Tag::class, 'green'), $second->idOf(Tag::class, 'red'), 'records');
+        $this->assertGreaterThan($first->idOf(Sub::class, 'second'), $second->idOf(Plain::class, 'first'), 'records of a subclass');
+        $this->assertGreaterThan($firstJoinRow, $this->ledgerFirstId('FixturesTest_Plain_Tags'), 'join rows');
     }
 
     public function testATableTooLargeForOneInsertIsSplitAcrossInserts(): void
@@ -255,6 +269,11 @@ final class FixtureLoaderTest extends SapphireTest
         }
 
         $this->assertSame(2, Tag::get()->count());
+    }
+
+    private function ledgerFirstId(string $table): int
+    {
+        return (int) FixtureLedger::get()->find('TableName', $table)?->FirstID;
     }
 
     private function tag(string $title): Tag
