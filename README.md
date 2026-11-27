@@ -185,7 +185,12 @@ A named class is cleared with its subclasses, selected by `ClassName`: naming `P
 
 ## Benchmark
 
-`task benchmark` loads and clears the same fixture set (30 files, 360 versioned records in a page, section, row, column and content tree) with the framework's handling and with this loader, and prints wall time and the number of statements MySQL executed for each step. It also compares the loader's `DELETE`-based clear with truncating the loaded tables. The report is written to `coverage/benchmark.md`; CI publishes it on every run without a threshold.
+`task benchmark` loads and clears the same fixture set (30 files, 360 versioned records in a page, section, row, column and content tree) with the framework's handling and with this loader, and prints wall time and the number of statements MySQL executed for each step. It measures two ways, each labelled in the report:
+
+- **Whole set**: all 30 files in one load, then one clear. This is what loading many files together saves, as a browser test that loads its whole set does.
+- **Per file**: one load and one clear for each file, summed over the 30 files. This is what a suite of test classes with one fixture file each costs: the loader cannot batch across classes, and every class pays its own clear.
+
+Both also compare the loader's `DELETE`-based clear with truncating the loaded tables. The report is written to `coverage/benchmark.md`; CI publishes it on every run without a threshold.
 
 ## Development
 
