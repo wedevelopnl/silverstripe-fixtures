@@ -206,7 +206,7 @@ final readonly class Validator
     private function fieldProblem(ClassSchema $schema, string $field, mixed $value, array $keys): ?string
     {
         return match ($schema->kind($field)) {
-            FieldKind::Column, FieldKind::Composite => $this->valueProblem($schema, $field, $value),
+            FieldKind::Value => $this->valueProblem($schema, $field, $value),
             FieldKind::HasOne => $this->referenceProblem($field, $value, $keys),
             FieldKind::ManyMany => $this->manyManyProblem($schema->class, $field, $value, $keys),
             FieldKind::ManyManyThrough => sprintf('"%s" is a many_many through; declare records of its join class instead', $field),

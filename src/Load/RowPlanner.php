@@ -19,12 +19,8 @@ use WeDevelop\Fixtures\Schema\SchemaMap;
  */
 final readonly class RowPlanner
 {
-    public function __construct(
-        private SchemaMap $schemas,
-        private VersionedRows $versionedRows = new VersionedRows(),
-        private FilePlacer $filePlacer = new FilePlacer(),
-        private LocalisedRows $localisedRows = new LocalisedRows(),
-    ) {
+    public function __construct(private SchemaMap $schemas)
+    {
     }
 
     /**
@@ -80,7 +76,7 @@ final readonly class RowPlanner
         }
 
         if ($schema->versioned) {
-            $this->versionedRows->add($plan, $schema, $rows, $record->published === true);
+            VersionedRows::add($plan, $schema, $rows, $record->published === true);
         } else {
             foreach ($rows as $table => $row) {
                 $plan->add($table, $row);
@@ -88,7 +84,7 @@ final readonly class RowPlanner
         }
 
         if ($record->locales !== []) {
-            $this->localisedRows->add($plan, $schema, $record, $rows);
+            LocalisedRows::add($plan, $schema, $record, $rows);
         }
 
         foreach ($record->fields as $field => $value) {
@@ -121,7 +117,7 @@ final readonly class RowPlanner
             }
 
             $schema = $schemas[$record->key()];
-            $placed = $this->filePlacer->place(
+            $placed = FilePlacer::place(
                 (string) PathResolver::resolve($record->source),
                 $this->filename($record, $byKey),
                 // Without stages a file is as public as its record, as AssetControlExtension has it
@@ -167,7 +163,7 @@ final readonly class RowPlanner
 
         foreach ($record->fields as $field => $value) {
             $kind = $schema->kind($field);
-            if ($kind === FieldKind::Column || $kind === FieldKind::Composite) {
+            if ($kind === FieldKind::Value) {
                 $values = [...$values, ...$schema->columnValues($field, $value)];
             } elseif ($kind === FieldKind::HasOne) {
                 $values = [...$values, ...$this->hasOneValues($plan, $schema, $field, $value)];
