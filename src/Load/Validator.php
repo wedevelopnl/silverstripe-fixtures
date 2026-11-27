@@ -98,9 +98,11 @@ final readonly class Validator
         $translated = array_merge(...array_values($schema->localisedTables));
         $problems = [];
         foreach ($record->locales as $locale => $values) {
-            foreach (array_keys($values) as $field) {
+            foreach ($values as $field => $value) {
                 if (!in_array($field, $translated, true)) {
                     $problems[] = sprintf('"@locales": "%s" is not translated (%s)', $field, $locale);
+                } elseif (self::isReference($value)) {
+                    $problems[] = sprintf('"@locales": "%s" cannot hold a reference (%s)', $field, $locale);
                 }
             }
         }
@@ -172,7 +174,7 @@ final readonly class Validator
     private function fieldProblem(ClassSchema $schema, string $field, mixed $value, array $keys): ?string
     {
         return match ($schema->kind($field)) {
-            FieldKind::Column, FieldKind::Composite => null,
+            FieldKind::Column, FieldKind::Composite => $this->valueProblem($schema, $field, $value),
             FieldKind::HasOne => $this->referenceProblem($field, $value, $keys),
             FieldKind::ManyMany => $this->manyManyProblem($schema->class, $field, $value, $keys),
             FieldKind::ManyManyThrough => sprintf('"%s" is a many_many through; declare records of its join class instead', $field),
@@ -181,6 +183,29 @@ final readonly class Validator
             FieldKind::Fixed => sprintf('"%s" is set by the loader', $field),
             FieldKind::Unknown => sprintf('unknown value "%s"', $field),
         };
+    }
+
+    /**
+     * The framework resolves a reference in any field, this loader only in a relation: elsewhere it would be
+     * written as the text of the reference.
+     */
+    private function valueProblem(ClassSchema $schema, string $field, mixed $value): ?string
+    {
+        if (!self::isReference($value)) {
+            return null;
+        }
+
+        $relation = substr($field, 0, -2);
+        if (str_ends_with($field, 'ID') && $schema->kind($relation) === FieldKind::HasOne) {
+            return sprintf('"%s" cannot hold a reference; set the has_one instead: %s: =>Class.identifier', $field, $relation);
+        }
+
+        return sprintf('"%s" cannot hold a reference; only a has_one or many_many takes one', $field);
+    }
+
+    private static function isReference(mixed $value): bool
+    {
+        return is_string($value) && str_starts_with($value, '=>');
     }
 
     /**
