@@ -1,0 +1,18 @@
+WeDevelop\Fixtures\Tests\Integration\Model\VersionedRecord:
+  '@published': true
+  home:
+    Title: Home
+  draft:
+    Title: Draft
+    '@published': false
+WeDevelop\Fixtures\Tests\Integration\Model\VersionedSub:
+  sub:
+    Title: Sub
+    Extra: extra
+    '@published': true
+  subDraft:
+    Title: Sub draft
+WeDevelop\Fixtures\Tests\Integration\Model\UnstagedRecord:
+  unstaged:
+    Title: Unstaged
+    '@published': false

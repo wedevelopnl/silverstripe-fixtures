@@ -1,0 +1,7 @@
+WeDevelop\Fixtures\Tests\Integration\Model\Tag:
+  first:
+    Title: First
+    Code: same
+  second:
+    Title: Second
+    Code: same

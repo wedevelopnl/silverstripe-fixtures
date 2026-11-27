@@ -1,0 +1,12 @@
+---
+Name: fixtures-harness
+After: sapphiretest
+---
+# Switches the package's test state on for the harness project, the way a
+# consuming project does: every SapphireTest with a $fixture_file loads it
+# through WeDevelop\Fixtures\FixtureLoader.
+SilverStripe\Core\Injector\Injector:
+  SilverStripe\Dev\State\SapphireTestState:
+    properties:
+      States:
+        fixtures: '%$WeDevelop\Fixtures\Dev\FixtureTestState'

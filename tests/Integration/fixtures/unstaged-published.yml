@@ -1,0 +1,4 @@
+WeDevelop\Fixtures\Tests\Integration\Model\UnstagedRecord:
+  unstaged:
+    Title: Unstaged
+    '@published': true

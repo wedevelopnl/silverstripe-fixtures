@@ -1,0 +1,10 @@
+WeDevelop\Fixtures\Tests\Integration\Model\VersionedRecord:
+  draft:
+    Title: Draft
+WeDevelop\Fixtures\Tests\Integration\Model\VersionedSub:
+  sub:
+    Title: Sub
+    Extra: extra
+WeDevelop\Fixtures\Tests\Integration\Model\UnstagedRecord:
+  unstaged:
+    Title: Unstaged

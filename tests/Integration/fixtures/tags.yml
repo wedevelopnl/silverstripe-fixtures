@@ -1,0 +1,5 @@
+WeDevelop\Fixtures\Tests\Integration\Model\Tag:
+  red:
+    Title: Red
+  blue:
+    Title: Blue

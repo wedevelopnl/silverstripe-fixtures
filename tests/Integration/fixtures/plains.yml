@@ -1,0 +1,11 @@
+WeDevelop\Fixtures\Tests\Integration\Model\Plain:
+  first:
+    Title: First
+    Tags:
+      - =>WeDevelop\Fixtures\Tests\Integration\Model\Tag.blue
+WeDevelop\Fixtures\Tests\Integration\Model\Tag:
+  green:
+    Title: Green
+WeDevelop\Fixtures\Tests\Integration\Model\Sub:
+  second:
+    Title: Second

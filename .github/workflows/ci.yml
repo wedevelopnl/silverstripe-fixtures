@@ -15,13 +15,16 @@ permissions:
   contents: read
 
 jobs:
+  # In the optional-modules testbed: src/ uses Versioned and Fluent behind
+  # installed-checks, and the analysers need those classes to resolve. Each
+  # php-qa leg verifies its own lock.
   static-analysis:
     name: Static Analysis
     runs-on: ubuntu-latest
     env:
-      COMPOSE: docker compose -f .docker/compose.yml -f .docker/compose.ci.yml
+      COMPOSE: docker compose -f .docker/compose.yml -f .docker/compose.ci.yml --profile modules
       COMPOSE_BAKE: 'true'
-      CACHE_SCOPE: app-php8.3
+      CACHE_SCOPE: app-modules-php8.3
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
     steps:
       - uses: actions/checkout@v7
@@ -40,14 +43,9 @@ jobs:
       - uses: ./.github/actions/setup-docker-mirror
       - run: task docker-env
       - name: Build image (GHA layer cache)
-        run: $COMPOSE build app
+        run: $COMPOSE build app-modules
       - name: Start services
-        run: $COMPOSE up -d --wait app
-      # Composer never re-checks a path package's requirements when installing
-      # from a lock, so a new module dependency would otherwise be silently
-      # absent from every job.
-      - name: Verify the lock covers the module
-        run: $COMPOSE exec -T app /app/verify-lock.sh
+        run: $COMPOSE up -d --wait app-modules
       - run: task analyse
       # PHPStan gates some checks on the analysis target rather than the runtime
       # PHP (e.g. #[\NoDiscard] at >= 8.5); the primary pass keeps the 8.3 floor.
@@ -104,6 +102,11 @@ jobs:
         run: $COMPOSE build ${{ matrix.service }}
       - name: Start services
         run: $COMPOSE up -d --wait ${{ matrix.service }}
+      # Composer never re-checks a path package's requirements when installing
+      # from a lock, so a new module dependency would otherwise be silently
+      # absent from every job.
+      - name: Verify the lock covers the module
+        run: $COMPOSE exec -T ${{ matrix.service }} /app/verify-lock.sh
       - if: matrix.variant == 'base'
         name: Run tests (no optional modules)
         run: $COMPOSE exec -T ${{ matrix.service }} vendor/bin/phpunit --log-junit coverage/junit.xml
@@ -127,3 +130,50 @@ jobs:
           name: PHPUnit Results (${{ matrix.variant }} / PHP ${{ matrix.php }})
           path: coverage/junit.xml
           reporter: java-junit
+
+  # Timings vary with the runner: the report is published, never judged.
+  benchmark:
+    name: Benchmark
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      COMPOSE: docker compose -f .docker/compose.yml -f .docker/compose.ci.yml --profile modules
+      COMPOSE_BAKE: 'true'
+      CACHE_SCOPE: app-modules-php8.3
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Log in to Docker Hub
+        if: env.DOCKERHUB_USERNAME != ''
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - uses: arduino/setup-task@c0bc642852239c2689f73f4ea6459c29405f3c52 # v3.0.0
+        with:
+          version: 3.x
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: ./.github/actions/setup-docker-mirror
+      - run: task docker-env
+      - name: Build image (GHA layer cache)
+        run: $COMPOSE build app-modules
+      - name: Start services
+        run: $COMPOSE up -d --wait app-modules
+      - run: task benchmark
+      - name: Publish the report
+        if: always()
+        run: |
+          if [ -f coverage/benchmark.md ]; then
+            cat coverage/benchmark.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: benchmark-report
+          path: coverage/benchmark.md
+          if-no-files-found: ignore
+      - name: Container diagnostics
+        if: failure()
+        uses: ./.github/actions/container-diagnostics
+        with:
+          compose: ${{ env.COMPOSE }}

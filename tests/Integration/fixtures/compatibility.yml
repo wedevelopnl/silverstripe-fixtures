@@ -1,0 +1,38 @@
+WeDevelop\Fixtures\Tests\Integration\Model\Tag:
+  red:
+    Title: Red
+  blue:
+    Title: Blue
+WeDevelop\Fixtures\Tests\Integration\Model\Plain:
+  root:
+    Title: Root
+    Flag: true
+    PriceAmount: 12.5
+    PriceCurrency: EUR
+    Status: Done
+    Target: =>WeDevelop\Fixtures\Tests\Integration\Model\Tag.red
+    Tags:
+      - =>WeDevelop\Fixtures\Tests\Integration\Model\Tag.red
+      - ref: =>WeDevelop\Fixtures\Tests\Integration\Model\Tag.blue
+        Weight: 3
+  child:
+    Title: Child
+    Price:
+      Amount: 3
+      Currency: USD
+    Parent: =>WeDevelop\Fixtures\Tests\Integration\Model\Plain.root
+    Related:
+      - =>WeDevelop\Fixtures\Tests\Integration\Model\Plain.root
+WeDevelop\Fixtures\Tests\Integration\Model\Sub:
+  leaf:
+    Title: Leaf
+    Level: 2
+WeDevelop\Fixtures\Tests\Integration\Model\SubWithoutTable:
+  tableless:
+    Title: Tableless
+    Note: stated
+WeDevelop\Fixtures\Tests\Integration\Model\PlainLink:
+  link:
+    Weight: 4
+    From: =>WeDevelop\Fixtures\Tests\Integration\Model\Plain.root
+    To: =>WeDevelop\Fixtures\Tests\Integration\Model\Tag.blue

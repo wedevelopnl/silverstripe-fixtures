@@ -1,0 +1,7 @@
+SilverStripe\Assets\Image:
+  banner:
+    Name: banner.png
+Page:
+  contact:
+    Title: Contact
+  empty:

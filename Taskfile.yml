@@ -101,6 +101,14 @@ tasks:
     cmds:
       - "{{.EXEC_MODULES}} vendor/bin/phpunit"
 
+  benchmark:
+    desc: Compare loading and clearing with the framework's fixture handling (report in coverage/benchmark.md)
+    deps: [ensure-up-modules]
+    # The modules testbed: the benchmark's page tree is versioned. Its timings
+    # are a report, not a gate.
+    cmds:
+      - "{{.EXEC_MODULES}} vendor/bin/phpunit --testsuite benchmark --no-coverage"
+
   coverage:
     desc: Run all tests in the optional-modules testbed with coverage (HTML + Clover)
     deps: [ensure-up-modules]
@@ -146,38 +154,41 @@ tasks:
       - "{{.EXEC}} /app/verify-lock.sh"
 
   # --- Static analysis ------------------------------------------------------
+  # In the optional-modules testbed: src/ uses Versioned and Fluent behind
+  # installed-checks, and the analysers need those classes to resolve.
 
   analyse:
     desc: Run PHPStan static analysis
-    deps: [ensure-up]
+    deps: [ensure-up-modules]
     cmds:
-      - "{{.EXEC}} vendor/bin/phpstan analyse -c phpstan.neon.dist --memory-limit=512M"
+      - "{{.EXEC_MODULES}} vendor/bin/phpstan analyse -c phpstan.neon.dist --memory-limit=512M"
 
   analyse-php85:
     desc: Run PHPStan with the analysis target pinned to PHP 8.5 (in addition to the 8.3-range primary pass)
-    deps: [ensure-up]
+    deps: [ensure-up-modules]
     cmds:
-      - "{{.EXEC}} vendor/bin/phpstan analyse -c phpstan-php85.neon.dist --memory-limit=512M"
+      - "{{.EXEC_MODULES}} vendor/bin/phpstan analyse -c phpstan-php85.neon.dist --memory-limit=512M"
 
   rector:
     desc: Run Rector refactoring (applies changes)
-    deps: [ensure-up]
+    deps: [ensure-up-modules]
     cmds:
-      - "{{.EXEC}} vendor/bin/rector process"
+      - "{{.EXEC_MODULES}} vendor/bin/rector process"
 
   rector-dry:
     desc: Run Rector in dry-run mode (preview only)
-    deps: [ensure-up]
+    deps: [ensure-up-modules]
     cmds:
-      - "{{.EXEC}} vendor/bin/rector process --dry-run --no-progress-bar"
+      - "{{.EXEC_MODULES}} vendor/bin/rector process --dry-run --no-progress-bar"
 
   class-leak:
     desc: Find classes in src/ that nothing references
-    deps: [ensure-up]
+    deps: [ensure-up-modules]
     # Runs in the container: class-leak resolves skip types with is_a(), so the
-    # framework has to autoload.
+    # framework has to autoload. Test states are entry points registered only in
+    # project config (SapphireTestState.States), which class-leak cannot read.
     cmds:
-      - "{{.EXEC}} vendor/bin/class-leak check /module/src"
+      - "{{.EXEC_MODULES}} vendor/bin/class-leak check /module/src --skip-type='SilverStripe\\Dev\\State\\TestState'"
 
   # --- SilverStripe helpers -------------------------------------------------
 

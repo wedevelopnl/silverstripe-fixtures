@@ -8,13 +8,18 @@
          resolveDependencies="true"
          beStrictAboutTestsThatDoNotTestAnything="true"
          failOnRisky="true"
-         failOnWarning="true">
+         failOnWarning="true"
+         defaultTestSuite="unit,integration">
     <testsuites>
         <testsuite name="unit">
             <directory>vendor/wedevelopnl/silverstripe-fixtures/tests/Unit</directory>
         </testsuite>
         <testsuite name="integration">
             <directory>vendor/wedevelopnl/silverstripe-fixtures/tests/Integration</directory>
+        </testsuite>
+        <!-- Run only by `task benchmark`: timings, not assertions. -->
+        <testsuite name="benchmark">
+            <directory>vendor/wedevelopnl/silverstripe-fixtures/tests/Benchmark</directory>
         </testsuite>
     </testsuites>
     <source>
