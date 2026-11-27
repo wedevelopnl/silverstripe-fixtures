@@ -2,6 +2,9 @@ SilverStripe\Assets\Folder:
   uploads:
     Name: Uploads
     Title: Uploads
+  uploads_again:
+    Name: Uploads
+    Title: Uploads again
 SilverStripe\Assets\File:
   missing:
     Name: missing.txt
@@ -9,6 +12,12 @@ SilverStripe\Assets\File:
     '@source': 'wedevelopnl/silverstripe-fixtures:tests/files/missing.txt'
   nameless:
     '@source': 'wedevelopnl/silverstripe-fixtures:tests/files/notes.txt'
+  readme:
+    Name: readme.txt
+    Parent: =>SilverStripe\Assets\Folder.uploads
+  readme_copy:
+    Name: readme.txt
+    Parent: =>SilverStripe\Assets\Folder.uploads
 WeDevelop\Fixtures\Tests\Integration\Model\Tag:
   red:
     Title: Red
