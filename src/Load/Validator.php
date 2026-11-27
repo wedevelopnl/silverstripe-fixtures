@@ -30,7 +30,11 @@ final readonly class Validator
      */
     public function validate(array $records): array
     {
-        $keys = array_flip(array_map(static fn (FixtureRecord $record): string => $record->key(), $records));
+        $keys = [];
+        foreach ($records as $record) {
+            $keys[$record->key()] = $record;
+        }
+
         $problems = [];
         $places = [];
         foreach ($records as $record) {
@@ -43,7 +47,7 @@ final readonly class Validator
             $schema = $this->schemas->forClass($class);
             $recordProblems = $this->recordProblems($record, $schema, $keys);
             if ($schema->isFile) {
-                $recordProblems = [...$recordProblems, ...$this->samePlaceProblems($record, $places)];
+                $recordProblems = [...$recordProblems, ...$this->samePlaceProblems($record, $places), ...$this->parentCycleProblems($record, $keys)];
             }
 
             foreach ($recordProblems as $problem) {
@@ -55,7 +59,7 @@ final readonly class Validator
     }
 
     /**
-     * @param array<string, int> $keys every record of the load, by reference name
+     * @param array<string, FixtureRecord> $keys every record of the load, by reference name
      *
      * @return list<string>
      */
@@ -201,7 +205,34 @@ final readonly class Validator
     }
 
     /**
-     * @param array<string, int> $keys
+     * A folder chain that leads back to the record gives it no path in the store. A record below such a chain is
+     * left to the records in it, which are each reported.
+     *
+     * @param array<string, FixtureRecord> $keys
+     *
+     * @return list<string>
+     */
+    private function parentCycleProblems(FixtureRecord $record, array $keys): array
+    {
+        $chain = [$record->key()];
+        $key = $record->key();
+        while (($key = Reference::parse($keys[$key]->fields['Parent'] ?? null)) !== null && isset($keys[$key])) {
+            if ($key === $record->key()) {
+                return [sprintf('"Parent" leads back to the record itself: %s', implode(' => ', [...$chain, $key]))];
+            }
+
+            if (in_array($key, $chain, true)) {
+                return [];
+            }
+
+            $chain[] = $key;
+        }
+
+        return [];
+    }
+
+    /**
+     * @param array<string, FixtureRecord> $keys
      */
     private function fieldProblem(ClassSchema $schema, string $field, mixed $value, array $keys): ?string
     {
@@ -241,7 +272,7 @@ final readonly class Validator
     }
 
     /**
-     * @param array<string, int> $keys
+     * @param array<string, FixtureRecord> $keys
      */
     private function referenceProblem(string $field, mixed $value, array $keys): ?string
     {
@@ -255,7 +286,7 @@ final readonly class Validator
 
     /**
      * @param class-string<DataObject> $class
-     * @param array<string, int> $keys
+     * @param array<string, FixtureRecord> $keys
      */
     private function manyManyProblem(string $class, string $field, mixed $value, array $keys): ?string
     {

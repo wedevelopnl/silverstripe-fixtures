@@ -111,7 +111,7 @@ SilverStripe\Assets\Image:
 
 - The file goes through the asset store's own API under the record's folder path and `Name`; the record gets its hash and filename. `Name` is required with `@source`.
 - A published file is public, a draft-only file protected. Without Versioned a file has no stages and is public. A file an earlier load published and the fixture now declares draft-only is protected again.
-- Give the test data folders of its own: a file or folder at a name the site already has refuses the load, and so do two records of one load at the same name in the same folder.
+- Give the test data folders of its own: a file or folder at a name the site already has refuses the load, and so do two records of one load at the same name in the same folder, and a `Parent` chain that leads back to a record.
 - `@source` on a class that is not a `File` refuses the load. Reset deletes the records, never the files on disk.
 
 ### Paths

@@ -130,6 +130,9 @@ final class FileFixtureTest extends SapphireTest
             $this->assertSame(
                 [
                     $where . 'SilverStripe\Assets\Folder.uploads_again: "Uploads" is also the name of SilverStripe\Assets\Folder.uploads in the same folder',
+                    $where . 'SilverStripe\Assets\Folder.own_parent: "Parent" leads back to the record itself: SilverStripe\Assets\Folder.own_parent => SilverStripe\Assets\Folder.own_parent',
+                    $where . 'SilverStripe\Assets\Folder.loop_a: "Parent" leads back to the record itself: SilverStripe\Assets\Folder.loop_a => SilverStripe\Assets\Folder.loop_b => SilverStripe\Assets\Folder.loop_a',
+                    $where . 'SilverStripe\Assets\Folder.loop_b: "Parent" leads back to the record itself: SilverStripe\Assets\Folder.loop_b => SilverStripe\Assets\Folder.loop_a => SilverStripe\Assets\Folder.loop_b',
                     $where . 'SilverStripe\Assets\File.missing: "@source": no file at wedevelopnl/silverstripe-fixtures:tests/files/missing.txt',
                     $where . 'SilverStripe\Assets\File.nameless: "Name" is required for a file with "@source"',
                     $where . 'SilverStripe\Assets\File.readme_copy: "readme.txt" is also the name of SilverStripe\Assets\File.readme in the same folder',

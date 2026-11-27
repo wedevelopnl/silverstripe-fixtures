@@ -5,6 +5,15 @@ SilverStripe\Assets\Folder:
   uploads_again:
     Name: Uploads
     Title: Uploads again
+  own_parent:
+    Name: Own parent
+    Parent: =>SilverStripe\Assets\Folder.own_parent
+  loop_a:
+    Name: Loop A
+    Parent: =>SilverStripe\Assets\Folder.loop_b
+  loop_b:
+    Name: Loop B
+    Parent: =>SilverStripe\Assets\Folder.loop_a
 SilverStripe\Assets\File:
   missing:
     Name: missing.txt
@@ -18,6 +27,10 @@ SilverStripe\Assets\File:
   readme_copy:
     Name: readme.txt
     Parent: =>SilverStripe\Assets\Folder.uploads
+  in_a_loop:
+    Name: logo.png
+    Parent: =>SilverStripe\Assets\Folder.loop_a
+    '@source': 'wedevelopnl/silverstripe-fixtures:tests/files/logo.png'
 WeDevelop\Fixtures\Tests\Integration\Model\Tag:
   red:
     Title: Red
