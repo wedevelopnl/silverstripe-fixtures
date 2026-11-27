@@ -133,8 +133,8 @@ final class LedgerReset
             $found = [...$found, ...$classNames];
         }
 
-        // A class removed from the code base since has no tables of its own left to clear
-        $classNames = array_values(array_filter(array_unique($found), ClassInfo::exists(...)));
+        // A class removed from the code base since has no ancestry, so only the base table is cleared for it
+        $classNames = array_values(array_unique($found));
         $tables = [$baseTable];
         foreach ($classNames as $className) {
             foreach (ClassInfo::ancestry($className, true) as $tableClass) {
