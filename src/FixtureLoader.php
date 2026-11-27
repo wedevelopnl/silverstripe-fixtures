@@ -11,6 +11,7 @@ use SilverStripe\Core\Injector\Injectable;
 use SilverStripe\ORM\DataObject;
 use SilverStripe\ORM\Connect\Database;
 use SilverStripe\ORM\DB;
+use SilverStripe\Versioned\RecursiveStagesService;
 use TractorCow\Fluent\Model\Domain;
 use TractorCow\Fluent\Model\Locale;
 use WeDevelop\Fixtures\Load\FixtureReader;
@@ -135,6 +136,11 @@ class FixtureLoader
             // Fluent keeps the locales and domains in memory, as FluentTestState clears them; a load can add some
             Locale::clearCached();
             Domain::clearCached();
+        }
+
+        if (class_exists(RecursiveStagesService::class)) {
+            // Versioned keeps whether an owner's owned records differ between stages, which a load can change
+            RecursiveStagesService::reset();
         }
 
         // The DataObject singleton returns before its extensions' onFlushCache, where Versioned clears its version

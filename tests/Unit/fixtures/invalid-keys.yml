@@ -1,12 +1,18 @@
 Page:
   '@published': maybe
   '@sort': 1
+  '@draft':
+    Title: Draft
   home:
     '@published': 'yes'
     '@locales': nl_NL
     '@source': [a]
+    '@draft': Draft
     '@unknown': 1
   about:
     '@locales':
       nl_NL: Thuis
+    '@draft': [Draft]
+  contact:
+    '@draft': {}
 Member: not-a-map

@@ -1,0 +1,7 @@
+Page:
+  about:
+    Title: About us
+    URLSegment: about-us
+    '@published': true
+    '@draft':
+      Title: About us (draft)

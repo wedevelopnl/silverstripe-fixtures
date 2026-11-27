@@ -1,0 +1,10 @@
+WeDevelop\Fixtures\Tests\Integration\Model\VersionedRecord:
+  unpublished:
+    Title: Unpublished
+    '@draft':
+      Title: Draft
+WeDevelop\Fixtures\Tests\Integration\Model\UnstagedRecord:
+  unstaged:
+    Title: Unstaged
+    '@draft':
+      Title: Draft

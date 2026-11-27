@@ -20,6 +20,12 @@ use WeDevelop\Fixtures\Schema\SchemaMap;
  */
 final readonly class Validator
 {
+    /**
+     * The columns that decide where a file is in the store. A file is placed once, by the published values, so a
+     * draft value would leave the draft row naming a file the store does not have there.
+     */
+    private const array FILE_PLACE = ['Name', 'ParentID', 'File', 'FileFilename', 'FileHash', 'FileVariant'];
+
     public function __construct(private SchemaMap $schemas)
     {
     }
@@ -93,6 +99,47 @@ final readonly class Validator
             $problems[] = sprintf('"@published": %s has no published state', $record->class);
         } elseif ($record->published === true && !$schema->staged) {
             $problems[] = sprintf('"@published": %s is versioned without stages and has no published state', $record->class);
+        }
+
+        if ($record->draft !== []) {
+            $problems = [...$problems, ...$this->draftProblems($record, $schema, $keys)];
+        }
+
+        return $problems;
+    }
+
+    /**
+     * Draft values are plain values of the record's own fields: join rows have no stages to differ on, and a
+     * reference stays out of the draft change, as it does out of `@locales`.
+     *
+     * @param array<string, FixtureRecord> $keys
+     *
+     * @return list<string>
+     */
+    private function draftProblems(FixtureRecord $record, ClassSchema $schema, array $keys): array
+    {
+        $problems = [];
+        if (!$schema->versioned) {
+            $problems[] = sprintf('"@draft": %s has no published state', $record->class);
+        } elseif (!$schema->staged) {
+            $problems[] = sprintf('"@draft": %s is versioned without stages and has no published state', $record->class);
+        } elseif ($record->published !== true) {
+            $problems[] = '"@draft" needs a published record';
+        }
+
+        if ($record->locales !== []) {
+            $problems[] = '"@draft" cannot be combined with "@locales"';
+        }
+
+        foreach ($record->draft as $field => $value) {
+            $kind = $schema->kind($field);
+            if (in_array($kind, [FieldKind::HasOne, FieldKind::ManyMany], true) || ($kind === FieldKind::Value && $this->isReference($value))) {
+                $problems[] = sprintf('"@draft": "%s" cannot hold a reference', $field);
+            } elseif ($schema->isFile && in_array($field, self::FILE_PLACE, true)) {
+                $problems[] = sprintf('"@draft": "%s" cannot rename or move a file', $field);
+            } elseif (($problem = $this->fieldProblem($schema, $field, $value, $keys)) !== null) {
+                $problems[] = '"@draft": ' . $problem;
+            }
         }
 
         return $problems;

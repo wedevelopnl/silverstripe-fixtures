@@ -1,0 +1,6 @@
+WeDevelop\Fixtures\Tests\Integration\Model\VersionedRecord:
+  same:
+    Title: Same
+    '@published': true
+    '@draft':
+      Title: Same

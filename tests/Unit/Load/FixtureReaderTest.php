@@ -24,6 +24,7 @@ final class FixtureReaderTest extends TestCase
             [
                 'Page.home',
                 'Page.about',
+                'Page.team',
                 'SilverStripe\Assets\Image.logo',
                 'SilverStripe\Assets\Image.banner',
                 'Page.contact',
@@ -36,13 +37,16 @@ final class FixtureReaderTest extends TestCase
     public function testItSplitsLoaderKeysFromFieldsAndAppliesTheClassLevelPublishedDefault(): void
     {
         $set = (new FixtureReader())->read(['pages.yml' => self::DIR . 'pages.yml']);
-        [$home, $about, $logo] = $set->records;
+        [$home, $about, $team, $logo] = $set->records;
 
         $this->assertSame('pages.yml', $home->file);
         $this->assertSame(['Title' => 'Home'], $home->fields);
         $this->assertTrue($home->published);
         $this->assertSame(['nl_NL' => ['Title' => 'Thuis']], $home->locales);
         $this->assertFalse($about->published, 'a record overrides the class default');
+        $this->assertSame([], $home->draft);
+        $this->assertSame(['Title' => 'Team'], $team->fields, 'draft values are not the record\'s own');
+        $this->assertSame(['Title' => 'Team (draft)'], $team->draft);
         $this->assertNull($logo->published);
         $this->assertSame(dirname(self::DIR . 'pages.yml') . '/../../files/logo.png', $logo->source, 'a relative source is relative to its fixture file');
         $this->assertFileEquals(__DIR__ . '/../../files/logo.png', (string) $logo->source);
@@ -119,11 +123,15 @@ final class FixtureReaderTest extends TestCase
             [
                 'invalid-keys.yml, Page: "@published" must be true or false',
                 'invalid-keys.yml, Page: unknown loader key "@sort"',
+                'invalid-keys.yml, Page: "@draft" belongs on a record, not on a class',
                 'invalid-keys.yml, Page.home: "@published" must be true or false',
                 'invalid-keys.yml, Page.home: "@locales" must map a locale code to field values',
                 'invalid-keys.yml, Page.home: "@source" must be a path',
+                'invalid-keys.yml, Page.home: "@draft" must map field values',
                 'invalid-keys.yml, Page.home: unknown loader key "@unknown"',
                 'invalid-keys.yml, Page.about: "@locales" must map a locale code to field values',
+                'invalid-keys.yml, Page.about: "@draft" must map field values',
+                'invalid-keys.yml, Page.contact: "@draft" must map field values',
                 'invalid-keys.yml, Member: expected records by identifier',
             ],
             $set->problems,

@@ -125,14 +125,12 @@ final class FluentFixtureTest extends SapphireTest
         $this->emptyTables($tables);
 
         $loaded = FixtureLoader::singleton()->load(self::FIXTURES . 'localised-rows.yml');
-        [$loadedRows, $loadedVersions] = $this->latestVersionOnly($this->snapshot($tables, [
+
+        // The loader writes one version per locale: it is compared with the latest of write()'s, as version 1
+        $this->assertSame($this->latestVersions($written, 1), $this->snapshot($tables, [
             'sub' => $loaded->idOf(LocalisedSub::class, 'sub'),
             'bare' => $loaded->idOf(LocalisedSub::class, 'bare'),
         ]));
-
-        // The loader writes one version per locale: it is compared with the latest of write()'s
-        $this->assertSame($this->latestVersionOnly($written)[0], $loadedRows);
-        $this->assertSame([1], $loadedVersions);
     }
 
     public function testAVersionedClassWithPlainFluentGetsOnlyTheLocalisedRowsWriteLeaves(): void
@@ -256,6 +254,23 @@ final class FluentFixtureTest extends SapphireTest
                 $exception->getProblems(),
             );
         }
+    }
+
+    public function testDraftValuesCannotBeCombinedWithValuesPerLanguage(): void
+    {
+        $this->requireFluent();
+
+        try {
+            FixtureLoader::singleton()->load(self::FIXTURES . 'locales.yml', self::FIXTURES . 'localised-draft.yml');
+            $this->fail('Draft values with values per language must be refused');
+        } catch (InvalidFixtureException $exception) {
+            $this->assertSame(
+                [self::FIXTURES . 'localised-draft.yml, ' . LocalisedRecord::class . '.home: "@draft" cannot be combined with "@locales"'],
+                $exception->getProblems(),
+            );
+        }
+
+        $this->assertSame(0, LocalisedRecord::get()->count());
     }
 
     private static function fluentInstalled(): bool

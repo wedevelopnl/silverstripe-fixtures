@@ -12,6 +12,7 @@ final readonly class FixtureRecord
     /**
      * @param array<string, mixed> $fields every key that is not a loader key
      * @param array<string, array<string, mixed>> $locales localised field values by locale code
+     * @param array<string, mixed> $draft field values that differ on draft, over the published fields
      */
     public function __construct(
         public string $file,
@@ -21,6 +22,7 @@ final readonly class FixtureRecord
         public ?bool $published,
         public array $locales,
         public ?string $source,
+        public array $draft,
     ) {
     }
 

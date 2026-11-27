@@ -7,6 +7,10 @@ Page:
   about:
     Title: About us
     '@published': false
+  team:
+    Title: Team
+    '@draft':
+      Title: Team (draft)
 SilverStripe\Assets\Image:
   logo:
     Name: logo.png

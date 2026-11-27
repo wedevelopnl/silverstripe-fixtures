@@ -1,0 +1,23 @@
+SilverStripe\Assets\Folder:
+  fixture_files:
+    Name: fixture-files
+    Title: fixture-files
+    '@published': true
+    '@draft':
+      Name: renamed-files
+SilverStripe\Assets\Image:
+  logo:
+    Name: logo.png
+    Title: Logo
+    Parent: =>SilverStripe\Assets\Folder.fixture_files
+    '@source': '../../files/logo.png'
+    '@published': true
+    '@draft':
+      Title: Logo (draft)
+      Name: renamed.png
+      ParentID: 0
+      Parent: =>SilverStripe\Assets\Folder.fixture_files
+      File: renamed.png
+      FileFilename: renamed.png
+      FileHash: abc
+      FileVariant: thumbnail

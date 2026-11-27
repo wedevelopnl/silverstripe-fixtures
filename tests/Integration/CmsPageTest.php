@@ -47,6 +47,24 @@ final class CmsPageTest extends FunctionalTest
         $this->assertSame(404, $this->get('/about-us')->getStatusCode());
     }
 
+    public function testAPublishedPageWithADraftTitleIsModifiedAndShowsEachTitleOnItsOwnStage(): void
+    {
+        $loaded = FixtureLoader::singleton()->load(__DIR__ . '/fixtures/pages-draft.yml');
+
+        $about = Page::get()->byID($loaded->idOf('Page', 'about'));
+        $this->assertNotNull($about);
+        $this->assertTrue($about->isPublished());
+        $this->assertTrue($about->isModifiedOnDraft());
+        $this->assertArrayHasKey('modified', $about->getStatusFlags(), 'the CMS shows the page as modified');
+
+        $live = (string) $this->get('/about-us')->getBody();
+        $this->assertStringContainsString('About us', $live);
+        $this->assertStringNotContainsString('About us (draft)', $live, 'the live site shows the published title');
+
+        $this->logInWithPermission('ADMIN');
+        $this->assertStringContainsString('About us (draft)', (string) $this->get('/about-us?stage=Stage')->getBody(), 'the draft shows the draft title');
+    }
+
     public function testResettingPagesKeepsAPlainSiteTreeRecord(): void
     {
         $plain = SiteTree::create();
