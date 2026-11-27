@@ -68,6 +68,33 @@ final class FixtureReaderTest extends TestCase
         );
     }
 
+    public function testTheSameClassWrittenAnotherWayIsTheSameClass(): void
+    {
+        $set = (new FixtureReader())->read([
+            'pages.yml' => self::DIR . 'pages.yml',
+            'duplicate-spelling.yml' => self::DIR . 'duplicate-spelling.yml',
+        ]);
+
+        $this->assertSame(
+            ['duplicate-spelling.yml, \\page.home: is also declared in pages.yml'],
+            $set->problems,
+        );
+    }
+
+    public function testARecordWhoseBodyIsNotAMapOfValuesIsReported(): void
+    {
+        $set = (new FixtureReader())->read(['malformed-records.yml' => self::DIR . 'malformed-records.yml']);
+
+        $this->assertSame(
+            [
+                'malformed-records.yml, Page.home: expected field values by name',
+                'malformed-records.yml, Page.about: expected field values by name',
+            ],
+            $set->problems,
+        );
+        $this->assertSame(['Page.contact'], array_map(static fn (FixtureRecord $record): string => $record->key(), $set->records));
+    }
+
     public function testEveryMalformedLoaderKeyIsReported(): void
     {
         $set = (new FixtureReader())->read(['invalid-keys.yml' => self::DIR . 'invalid-keys.yml']);
