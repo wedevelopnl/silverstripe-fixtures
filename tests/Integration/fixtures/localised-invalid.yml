@@ -1,0 +1,10 @@
+WeDevelop\Fixtures\Tests\Integration\Model\LocalisedRecord:
+  home:
+    Title: Home
+    '@locales':
+      nl_NL: { Sort: 2, Unknown: x }
+WeDevelop\Fixtures\Tests\Integration\Model\Tag:
+  red:
+    Title: Red
+    '@locales':
+      nl_NL: { Title: Rood }

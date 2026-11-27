@@ -11,6 +11,7 @@ use SilverStripe\Core\Injector\Injectable;
 use SilverStripe\ORM\DataObject;
 use SilverStripe\ORM\Connect\Database;
 use SilverStripe\ORM\DB;
+use TractorCow\Fluent\Model\Locale;
 use WeDevelop\Fixtures\Load\FixtureReader;
 use WeDevelop\Fixtures\Load\PathResolver;
 use WeDevelop\Fixtures\Load\RowPlanner;
@@ -109,6 +110,11 @@ class FixtureLoader
     private function flushCaches(array $classes): void
     {
         DataObject::singleton()->flushCache();
+        if (class_exists(Locale::class)) {
+            // Fluent keeps the locales in memory; a load can add some
+            Locale::clearCached();
+        }
+
         foreach (array_unique($classes) as $class) {
             if (is_a($class, DataObject::class, true)) {
                 DataObject::singleton($class)->flushCache();

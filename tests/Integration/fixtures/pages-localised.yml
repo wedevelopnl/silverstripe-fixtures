@@ -1,0 +1,9 @@
+Page:
+  '@published': true
+  home:
+    Title: Home
+    URLSegment: home
+    Sort: 1
+    '@locales':
+      en_US: {}
+      nl_NL: { Title: Thuis }

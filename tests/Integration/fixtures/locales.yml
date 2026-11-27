@@ -1,0 +1,17 @@
+TractorCow\Fluent\Model\Locale:
+  en:
+    Locale: en_US
+    Title: English
+    URLSegment: en
+    IsGlobalDefault: true
+    Sort: 1
+  nl:
+    Locale: nl_NL
+    Title: Nederlands
+    URLSegment: nl
+    Sort: 2
+  de:
+    Locale: de_DE
+    Title: Deutsch
+    URLSegment: de
+    Sort: 3

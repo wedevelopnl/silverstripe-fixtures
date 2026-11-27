@@ -13,6 +13,7 @@ use SilverStripe\ORM\DataObjectSchema;
 use SilverStripe\ORM\FieldType\DBField;
 use SilverStripe\ORM\ManyManyThroughList;
 use SilverStripe\Versioned\Versioned;
+use TractorCow\Fluent\Extension\FluentExtension;
 
 /**
  * What write() would know about a class, read from the static schema without instantiating a record.
@@ -26,6 +27,8 @@ final readonly class ClassSchema
      * @param array<string, string> $specs field specification of every settable column and composite
      * @param array<string, string> $generated
      * @param array<string, mixed> $defaults static defaults of columns and composites, leaf class first
+     * @param array<string, list<string>>|null $localisedTables localised fields by table; null when the class is
+     *                                                     not localised
      */
     public function __construct(
         public string $class,
@@ -38,6 +41,7 @@ final readonly class ClassSchema
         public bool $versioned,
         public bool $staged,
         public bool $isFile,
+        public ?array $localisedTables,
     ) {
     }
 
@@ -75,6 +79,7 @@ final readonly class ClassSchema
             $versioned,
             $versioned && self::hasStages($class),
             is_a($class, File::class, true),
+            self::localisedTablesOf($class),
         );
     }
 
@@ -164,6 +169,35 @@ final readonly class ClassSchema
         }
 
         return $defaults;
+    }
+
+    /**
+     * The tables Fluent localises for the class, asked of its own extension. Reached only when
+     * tractorcow/silverstripe-fluent is installed.
+     *
+     * @param class-string<DataObject> $class
+     *
+     * @return array<string, list<string>>|null
+     */
+    private static function localisedTablesOf(string $class): ?array
+    {
+        if (!class_exists(FluentExtension::class)) {
+            return null;
+        }
+
+        $record = DataObject::singleton($class);
+        $fluent = $record->getExtensionInstance(FluentExtension::class);
+        if (!$fluent instanceof FluentExtension) {
+            return null;
+        }
+
+        $fluent->setOwner($record);
+        try {
+            /** @var array<string, list<string>> */
+            return $fluent->getLocalisedTables();
+        } finally {
+            $fluent->clearOwner();
+        }
     }
 
     /**
