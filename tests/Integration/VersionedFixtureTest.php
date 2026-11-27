@@ -216,6 +216,39 @@ final class VersionedFixtureTest extends SapphireTest
         ]);
     }
 
+    public function testAPublishedRecordHasTheRowsWriteAndPublishLeave(): void
+    {
+        $tables = [
+            'FixturesTest_VersionedRecord',
+            'FixturesTest_VersionedRecord_Live',
+            'FixturesTest_VersionedRecord_Versions',
+            'FixturesTest_VersionedSub',
+            'FixturesTest_VersionedSub_Live',
+            'FixturesTest_VersionedSub_Versions',
+        ];
+        DBDatetime::set_mock_now('2026-11-27 10:00:00');
+        $this->logOut();
+        $home = $this->writeRecord('Home', true);
+        $sub = VersionedSub::create();
+        $sub->update(['Title' => 'Sub', 'Extra' => 'extra']);
+        $sub->write();
+        $sub->publishSingle();
+        $written = $this->snapshot($tables, ['home' => $home->ID, 'sub' => $sub->ID]);
+
+        $this->assertCount(4, $written['FixturesTest_VersionedRecord_Versions'], 'write() and publish left two version rows each');
+        $this->emptyTables($tables);
+
+        $loaded = FixtureLoader::singleton()->load(self::FIXTURES . 'versioned-published.yml');
+        [$loadedRows, $loadedVersions] = $this->latestVersionOnly($this->snapshot($tables, [
+            'home' => $loaded->idOf(VersionedRecord::class, 'home'),
+            'sub' => $loaded->idOf(VersionedSub::class, 'sub'),
+        ]));
+
+        // The loader writes one version, which is published: it is compared with the latest of write()'s
+        $this->assertSame($this->latestVersionOnly($written)[0], $loadedRows);
+        $this->assertSame([1], $loadedVersions, 'draft, live and version rows carry the one version');
+    }
+
     /**
      * @template T of DataObject
      *

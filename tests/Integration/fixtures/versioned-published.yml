@@ -1,0 +1,9 @@
+WeDevelop\Fixtures\Tests\Integration\Model\VersionedRecord:
+  home:
+    Title: Home
+    '@published': true
+WeDevelop\Fixtures\Tests\Integration\Model\VersionedSub:
+  sub:
+    Title: Sub
+    Extra: extra
+    '@published': true

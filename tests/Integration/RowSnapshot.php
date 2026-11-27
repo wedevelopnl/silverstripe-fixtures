@@ -51,6 +51,45 @@ trait RowSnapshot
     }
 
     /**
+     * write() and publish leave a version row per write, the loader one by design: no edit history. Keeps the
+     * latest version row of each record and locale, and takes the Version column out of every row, since the
+     * numbers differ by that history.
+     *
+     * @param array<string, list<array<string, mixed>>> $snapshot
+     *
+     * @return array{array<string, list<array<string, mixed>>>, list<mixed>} the rows, and the Version values they held
+     */
+    private function latestVersionOnly(array $snapshot): array
+    {
+        $versions = [];
+        foreach ($snapshot as $table => $rows) {
+            if (str_ends_with($table, '_Versions')) {
+                $latest = [];
+                foreach ($rows as $row) {
+                    $group = json_encode([$row['RecordID'], $row['Locale'] ?? null]);
+                    if (!isset($latest[$group]) || $row['Version'] > $latest[$group]['Version']) {
+                        $latest[$group] = $row;
+                    }
+                }
+
+                $rows = array_values($latest);
+            }
+
+            foreach ($rows as $index => $row) {
+                if (array_key_exists('Version', $row)) {
+                    $versions[] = $row['Version'];
+                    unset($rows[$index]['Version']);
+                }
+            }
+
+            usort($rows, static fn (array $a, array $b): int => json_encode($a) <=> json_encode($b));
+            $snapshot[$table] = $rows;
+        }
+
+        return [$snapshot, array_values(array_unique($versions))];
+    }
+
+    /**
      * @param list<string> $tables
      */
     private function emptyTables(array $tables): void
