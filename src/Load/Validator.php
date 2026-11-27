@@ -32,6 +32,7 @@ final readonly class Validator
     {
         $keys = array_flip(array_map(static fn (FixtureRecord $record): string => $record->key(), $records));
         $problems = [];
+        $places = [];
         foreach ($records as $record) {
             $class = $this->schemas->resolve($record->class);
             if ($class === null) {
@@ -40,7 +41,12 @@ final readonly class Validator
             }
 
             $schema = $this->schemas->forClass($class);
-            foreach ($this->recordProblems($record, $schema, $keys) as $problem) {
+            $recordProblems = $this->recordProblems($record, $schema, $keys);
+            if ($schema->isFile) {
+                $recordProblems = [...$recordProblems, ...self::samePlaceProblems($record, $places)];
+            }
+
+            foreach ($recordProblems as $problem) {
                 $problems[] = $record->label() . ': ' . $problem;
             }
         }
@@ -164,6 +170,32 @@ final readonly class Validator
                 )];
             }
         }
+
+        return [];
+    }
+
+    /**
+     * Two records of one load at one place would share one file in the store, the later overwriting the earlier.
+     *
+     * @param array<string, string> $places reference name by folder and name, of the file records before this one
+     *
+     * @return list<string>
+     */
+    private static function samePlaceProblems(FixtureRecord $record, array &$places): array
+    {
+        $name = $record->fields['Name'] ?? null;
+        if (!is_string($name)) {
+            return [];
+        }
+
+        $parentId = $record->fields['ParentID'] ?? 0;
+        $parent = Reference::parse($record->fields['Parent'] ?? null) ?? (is_numeric($parentId) ? (int) $parentId : 0);
+        $place = $parent . '/' . $name;
+        if (isset($places[$place])) {
+            return [sprintf('"%s" is also the name of %s in the same folder', $name, $places[$place])];
+        }
+
+        $places[$place] = $record->key();
 
         return [];
     }
