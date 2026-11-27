@@ -65,6 +65,10 @@ class FixtureLoader
             throw new InvalidFixtureException($problems);
         }
 
+        if ($set->records === []) {
+            return new LoadedFixtures([]);
+        }
+
         $plan = (new RowPlanner($schemas))->plan($set->records);
         $this->connection()->withTransaction(static fn () => (new RowWriter())->write($plan));
         $this->flushCaches($plan->classes());
