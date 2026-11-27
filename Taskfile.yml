@@ -149,8 +149,12 @@ tasks:
 
   verify-lock:
     desc: Fail if either committed lock no longer covers the module's requirements
-    deps: [ensure-up, ensure-up-modules]
+    # The bring-ups are cmds, not deps, as in qa: both create the shared `db`
+    # container, so from a cold start they would race as parallel deps.
+    deps: [docker-env]
     cmds:
+      - task: ensure-up
+      - task: ensure-up-modules
       - "{{.EXEC}} /app/verify-lock.sh"
       - "{{.EXEC_MODULES}} /app/verify-lock.sh"
 
