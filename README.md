@@ -173,10 +173,11 @@ The `fixtures` task loads, unloads and resets fixtures without any code, from th
 ```sh
 vendor/bin/sake tasks:fixtures --action=load --file=app/tests/fixtures/pages.yml --file=app/tests/fixtures/files.yml
 vendor/bin/sake tasks:fixtures --action=reset --file=app/tests/fixtures/pages.yml
+vendor/bin/sake tasks:fixtures --action=reset --dir=app/tests/fixtures
 vendor/bin/sake tasks:fixtures --action=unload
 ```
 
-The same runs at `/dev/tasks/fixtures?action=load&file[]=app/tests/fixtures/pages.yml&file[]=app/tests/fixtures/files.yml`.
+The same runs at `/dev/tasks/fixtures?action=load&file[]=app/tests/fixtures/pages.yml&file[]=app/tests/fixtures/files.yml`, or `?action=reset&dir[]=app/tests/fixtures`.
 
 | Action | What it does |
 |---|---|
@@ -184,7 +185,7 @@ The same runs at `/dev/tasks/fixtures?action=load&file[]=app/tests/fixtures/page
 | `unload` | Clears what was loaded since the last clear, as `reset()` does |
 | `reset` | Clears and loads the files again, in one transaction: an invalid file leaves the earlier data in place |
 
-`--file` takes the paths `load()` takes; repeat it for several files. An invalid fixture lists its problems and the task fails: sake exits with a failure code, while the URL still answers 200 with `Task 'Load, unload or reset fixtures' failed` on the page, so a browser test checks the page text. Browser access follows the framework's dev tasks: open in dev mode, an admin login otherwise.
+`--file` takes the paths `load()` takes; repeat it for several files. `--dir` takes a directory, absolute or relative to the project root, and loads its `.yml` and `.yaml` files in name order, without those of its subdirectories; repeat it for several, and combine it with `--file`: everything loads together, so references resolve across all of it. A directory that is missing or holds no such file fails the task before anything is cleared or written. `unload` takes neither option. An invalid fixture lists its problems and the task fails: sake exits with a failure code, while the URL still answers 200 with `Task 'Load, unload or reset fixtures' failed` on the page, so a browser test checks the page text. Browser access follows the framework's dev tasks: open in dev mode, an admin login otherwise.
 
 ## Clearing test data
 

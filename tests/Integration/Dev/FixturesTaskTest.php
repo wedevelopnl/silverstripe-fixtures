@@ -28,6 +28,10 @@ final class FixturesTaskTest extends FunctionalTest
 
     private const string INVALID = __DIR__ . '/../fixtures/invalid.yml';
 
+    private const string DIRECTORY = __DIR__ . '/../fixtures/directory';
+
+    private const string EMPTY_DIRECTORY = __DIR__ . '/../fixtures/empty-directory';
+
     protected $usesDatabase = true;
 
     protected static $extra_dataobjects = [
@@ -75,12 +79,12 @@ final class FixturesTaskTest extends FunctionalTest
         $this->assertCount(0, Tag::get());
     }
 
-    public function testUnloadClearsWhatWasLoadedAndKeepsOtherRecords(): void
+    public function testUnloadClearsWhatWasLoadedKeepsOtherRecordsAndIgnoresDirectories(): void
     {
         $this->runTask(['--action' => 'load', '--file' => [self::TAGS]]);
         Tag::create(['Title' => 'Written by a test'])->write();
 
-        $this->assertSame(Command::SUCCESS, $this->runTask(['--action' => 'unload']));
+        $this->assertSame(Command::SUCCESS, $this->runTask(['--action' => 'unload', '--dir' => ['app/tests/missing']]));
 
         $this->assertSame(['Written by a test'], Tag::get()->column('Title'));
     }
@@ -127,11 +131,63 @@ final class FixturesTaskTest extends FunctionalTest
         $this->assertSame(['Red', 'Blue'], Tag::get()->sort('ID')->column('Title'));
     }
 
-    public function testLoadWithoutAFileFails(): void
+    public function testLoadWithADirectoryLoadsItsYmlAndYamlFilesAndSkipsOtherFilesAndSubdirectories(): void
+    {
+        $this->assertSame(Command::SUCCESS, $this->runTask(['--action' => 'load', '--dir' => [self::DIRECTORY]]));
+
+        $this->assertSame(['Red', 'Blue'], Tag::get()->sort('ID')->column('Title'), 'nested/more.yml stays out');
+        $linked = Plain::get()->filter('Title', 'Linked')->first();
+        $this->assertNotNull($linked, 'links.yaml is loaded');
+        $this->assertSame(['Red'], $linked->Tags()->column('Title'), 'a reference resolves across the files');
+        $this->assertStringContainsString(sprintf('%s.linked: %d', Plain::class, $linked->ID), $this->output);
+    }
+
+    public function testLoadTakesFilesAndADirectoryTogether(): void
+    {
+        $this->assertSame(
+            Command::SUCCESS,
+            $this->runTask(['--action' => 'load', '--file' => [self::PLAINS], '--dir' => [self::DIRECTORY]]),
+        );
+
+        $this->assertEqualsCanonicalizing(['Red', 'Blue', 'Green'], Tag::get()->column('Title'));
+        $first = Plain::get()->filter('Title', 'First')->first();
+        $this->assertNotNull($first);
+        $this->assertSame(['Blue'], $first->Tags()->column('Title'), 'a file refers to a record of the directory');
+    }
+
+    public function testResetWithADirectoryRelativeToTheProjectRootRestoresItsFilesAfterTheDataChanged(): void
+    {
+        // The harness installs the module here; the trailing slash is as a user may type it
+        $directory = 'vendor/wedevelopnl/silverstripe-fixtures/tests/Integration/fixtures/directory/';
+        $this->runTask(['--action' => 'load', '--dir' => [$directory]]);
+        $red = Tag::get()->filter('Title', 'Red')->first();
+        $this->assertNotNull($red);
+        $red->Title = 'Edited';
+        $red->write();
+
+        $this->assertSame(Command::SUCCESS, $this->runTask(['--action' => 'reset', '--dir' => [$directory]]));
+
+        $this->assertSame(['Red', 'Blue'], Tag::get()->sort('ID')->column('Title'));
+    }
+
+    public function testResetWithAMissingOrEmptyDirectoryNamesEachAndKeepsTheEarlierData(): void
+    {
+        $this->runTask(['--action' => 'load', '--file' => [self::TAGS]]);
+
+        $exitCode = $this->runTask(['--action' => 'reset', '--dir' => ['app/tests/missing', self::EMPTY_DIRECTORY]]);
+
+        $this->assertSame(Command::FAILURE, $exitCode);
+        $this->assertStringContainsString('nothing was written', $this->output);
+        $this->assertStringContainsString('app/tests/missing: no directory at this path', $this->output);
+        $this->assertStringContainsString(self::EMPTY_DIRECTORY . ': no .yml or .yaml file in this directory', $this->output);
+        $this->assertSame(['Red', 'Blue'], Tag::get()->sort('ID')->column('Title'));
+    }
+
+    public function testLoadWithoutAFileOrADirectoryFails(): void
     {
         $this->assertSame(Command::INVALID, $this->runTask(['--action' => 'load']));
 
-        $this->assertStringContainsString('Name at least one fixture file with --file', $this->output);
+        $this->assertStringContainsString('Name at least one fixture file with --file or directory with --dir', $this->output);
     }
 
     public function testAMissingOrUnknownActionFailsAndNamesTheActions(): void

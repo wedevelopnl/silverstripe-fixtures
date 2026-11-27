@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace WeDevelop\Fixtures\Dev;
 
+use SilverStripe\Control\Director;
 use SilverStripe\Dev\BuildTask;
 use SilverStripe\PolyExecution\PolyOutput;
 use Symfony\Component\Console\Command\Command;
@@ -38,6 +39,12 @@ class FixturesTask extends BuildTask
                 InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY,
                 'A fixture file, absolute or relative to the project root; repeat it to load several together',
             ),
+            new InputOption(
+                'dir',
+                null,
+                InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY,
+                'A directory whose .yml and .yaml files load together with the --file files, not those of its subdirectories; absolute or relative to the project root, repeatable',
+            ),
         ];
     }
 
@@ -46,14 +53,16 @@ class FixturesTask extends BuildTask
         $action = $input->getOption('action');
         /** @var list<string> $files */
         $files = $input->getOption('file');
+        /** @var list<string> $dirs */
+        $dirs = $input->getOption('dir');
         if (!in_array($action, self::ACTIONS, true)) {
             $output->writeln('<error>Name an action: --action=load, --action=unload or --action=reset</error>');
 
             return Command::INVALID;
         }
 
-        if ($action !== 'unload' && $files === []) {
-            $output->writeln('<error>Name at least one fixture file with --file</error>');
+        if ($action !== 'unload' && $files === [] && $dirs === []) {
+            $output->writeln('<error>Name at least one fixture file with --file or directory with --dir</error>');
 
             return Command::INVALID;
         }
@@ -61,8 +70,8 @@ class FixturesTask extends BuildTask
         $loader = FixtureLoader::singleton();
         try {
             match ($action) {
-                'load' => $this->report($loader->load(...$files), $output),
-                'reset' => $this->report($loader->reload(...$files), $output),
+                'load' => $this->report($loader->load(...$this->paths($files, $dirs)), $output),
+                'reset' => $this->report($loader->reload(...$this->paths($files, $dirs)), $output),
                 'unload' => $loader->reset(),
             };
         } catch (InvalidFixtureException | ResetRefusedException $exception) {
@@ -75,6 +84,46 @@ class FixturesTask extends BuildTask
         }
 
         return Command::SUCCESS;
+    }
+
+    /**
+     * @param list<string> $files
+     * @param list<string> $dirs
+     *
+     * @return list<string> the files, then each directory's .yml and .yaml files sorted by name, prefixed with the
+     *                      directory as given
+     *
+     * @throws InvalidFixtureException naming each directory that is missing or holds no fixture file
+     */
+    private function paths(array $files, array $dirs): array
+    {
+        $problems = [];
+        foreach ($dirs as $dir) {
+            $absolute = Director::is_absolute($dir) ? $dir : Director::baseFolder() . '/' . $dir;
+            if (!is_dir($absolute)) {
+                $problems[] = $dir . ': no directory at this path';
+                continue;
+            }
+
+            $names = array_filter(
+                scandir($absolute) ?: [],
+                static fn (string $name): bool => in_array(pathinfo($name, PATHINFO_EXTENSION), ['yml', 'yaml'], true)
+                    && is_file($absolute . '/' . $name),
+            );
+            if ($names === []) {
+                $problems[] = $dir . ': no .yml or .yaml file in this directory';
+            }
+
+            foreach ($names as $name) {
+                $files[] = rtrim($dir, '/') . '/' . $name;
+            }
+        }
+
+        if ($problems !== []) {
+            throw new InvalidFixtureException($problems);
+        }
+
+        return $files;
     }
 
     private function report(LoadedFixtures $loaded, PolyOutput $output): void
