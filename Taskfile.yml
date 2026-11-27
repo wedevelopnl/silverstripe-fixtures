@@ -191,9 +191,10 @@ tasks:
     deps: [ensure-up-modules]
     # Runs in the container: class-leak resolves skip types with is_a(), so the
     # framework has to autoload. Test states are entry points registered only in
-    # project config (SapphireTestState.States), which class-leak cannot read.
+    # project config (SapphireTestState.States), which class-leak cannot read;
+    # build tasks are entry points the framework finds by subclass.
     cmds:
-      - "{{.EXEC_MODULES}} vendor/bin/class-leak check /module/src --skip-type='SilverStripe\\Dev\\State\\TestState'"
+      - "{{.EXEC_MODULES}} vendor/bin/class-leak check /module/src --skip-type='SilverStripe\\Dev\\State\\TestState' --skip-type='SilverStripe\\Dev\\BuildTask'"
 
   # --- SilverStripe helpers -------------------------------------------------
 

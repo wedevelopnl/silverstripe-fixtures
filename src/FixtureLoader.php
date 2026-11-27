@@ -101,6 +101,23 @@ class FixtureLoader
         $this->flushCaches([...$classes, ...$deleted]);
     }
 
+    /**
+     * Resets and loads the files in one transaction: an invalid file or a database error leaves the data as it was.
+     *
+     * @throws InvalidFixtureException listing every problem; nothing is cleared or written then
+     * @throws ResetRefusedException outside the dev and test environments; nothing is deleted then
+     */
+    public function reload(string ...$paths): LoadedFixtures
+    {
+        $loaded = new LoadedFixtures([]);
+        $this->connection()->withTransaction(function () use ($paths, &$loaded): void {
+            $this->reset();
+            $loaded = $this->load(...$paths);
+        });
+
+        return $loaded;
+    }
+
     private function connection(): Database
     {
         return DB::get_conn() ?? throw new LogicException('There is no database connection');

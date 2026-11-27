@@ -161,9 +161,30 @@ $loader->reset();
 - `LoadedFixtures::toArray()` is keyed by the class as written in the fixture and keeps declaration order: files in argument order, classes by first appearance, identifiers in file order.
 - `InvalidFixtureException` (an `InvalidArgumentException`) lists every problem with its file, record and field; nothing is written then. `getProblems()` returns the list.
 - `reset()` throws `ResetRefusedException` (a `RuntimeException`) outside the dev and test environments.
+- `reload(string ...$paths): LoadedFixtures` resets and loads in one transaction: an invalid file or a database error leaves the data as it was.
 - Database errors propagate unchanged, and the load is rolled back.
 
 The ledger lives in the database, so a load in one process and a reset in another (a CLI task and an HTTP request) work together.
+
+## Using the task
+
+The `fixtures` task loads, unloads and resets fixtures without any code, from the command line or a browser test's setup:
+
+```sh
+vendor/bin/sake tasks:fixtures --action=load --file=app/tests/fixtures/pages.yml --file=app/tests/fixtures/files.yml
+vendor/bin/sake tasks:fixtures --action=reset --file=app/tests/fixtures/pages.yml
+vendor/bin/sake tasks:fixtures --action=unload
+```
+
+The same runs at `/dev/tasks/fixtures?action=load&file[]=app/tests/fixtures/pages.yml&file[]=app/tests/fixtures/files.yml`.
+
+| Action | What it does |
+|---|---|
+| `load` | Loads the files together and lists every record as `Class.identifier: ID` |
+| `unload` | Clears what was loaded since the last clear, as `reset()` does |
+| `reset` | Clears and loads the files again, in one transaction: an invalid file leaves the earlier data in place |
+
+`--file` takes the paths `load()` takes; repeat it for several files. An invalid fixture lists its problems and the task fails: sake exits with a failure code, while the URL still answers 200 with `Task 'Load, unload or reset fixtures' failed` on the page, so a browser test checks the page text. Browser access follows the framework's dev tasks: open in dev mode, an admin login otherwise.
 
 ## Clearing test data
 
