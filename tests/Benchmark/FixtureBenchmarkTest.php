@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace WeDevelop\Fixtures\Tests\Benchmark;
 
+use PHPUnit\Framework\Attributes\CoversNothing;
 use SilverStripe\Dev\FixtureFactory;
 use SilverStripe\Dev\SapphireTest;
 use SilverStripe\Dev\YamlFixture;
@@ -25,6 +26,7 @@ use WeDevelop\Fixtures\Tests\Benchmark\Model\BenchmarkSection;
  * for each file as a test class with one fixture file would, summed over the files. Run by `task benchmark`; it
  * asserts nothing about the figures.
  */
+#[CoversNothing]
 final class FixtureBenchmarkTest extends SapphireTest
 {
     private const int FILES = 30;

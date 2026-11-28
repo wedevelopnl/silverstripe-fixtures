@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace WeDevelop\Fixtures\Tests\Integration\Dev;
 
+use PHPUnit\Framework\Attributes\CoversClass;
 use SilverStripe\Core\Injector\Injector;
 use SilverStripe\Core\Kernel;
 use SilverStripe\Dev\FunctionalTest;
@@ -20,6 +21,8 @@ use WeDevelop\Fixtures\Tests\Integration\Model\PlainLink;
 use WeDevelop\Fixtures\Tests\Integration\Model\Sub;
 use WeDevelop\Fixtures\Tests\Integration\Model\Tag;
 
+#[CoversClass(FixturesTask::class)]
+#[CoversClass(FixtureLoader::class)]
 final class FixturesTaskTest extends FunctionalTest
 {
     private const string TAGS = __DIR__ . '/../fixtures/tags.yml';

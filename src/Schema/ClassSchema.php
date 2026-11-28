@@ -4,31 +4,37 @@ declare(strict_types=1);
 
 namespace WeDevelop\Fixtures\Schema;
 
+use LogicException;
 use SilverStripe\Assets\File;
 use SilverStripe\Core\ClassInfo;
 use SilverStripe\Core\Config\Config;
-use SilverStripe\Core\Injector\Injector;
 use SilverStripe\ORM\DataObject;
-use SilverStripe\ORM\DataObjectSchema;
-use SilverStripe\ORM\FieldType\DBField;
 use SilverStripe\ORM\ManyManyThroughList;
 use SilverStripe\Versioned\Versioned;
 use TractorCow\Fluent\Extension\FluentExtension;
 use TractorCow\Fluent\Extension\FluentVersionedExtension;
+use TractorCow\Fluent\Model\Locale;
 
 /**
- * What write() would know about a class, read from the static schema without instantiating a record.
+ * What write() would know about a class, read from the static schema without instantiating a record. Built only by
+ * of(), the one place that reads the framework's schema and config for it.
  */
 final readonly class ClassSchema
 {
     /**
      * @param class-string<DataObject> $class
      * @param list<string> $tables the class's tables, base first
-     * @param array<string, string> $columnTables table of every database column but ID
+     * @param array<string, string> $fieldTables table of every database column but ID and of every composite field
      * @param array<string, string> $specs field specification of every settable column and composite
-     * @param array<string, string> $generated
+     * @param array<string, FieldKind> $kinds what every key that is no plain value stands for
+     * @param array<string, array{join: string, parentField: string, childField: string, extraFields: array<string, string>}> $joins
+     *                                                     the join table, its columns and the extra field
+     *                                                     specifications of every many_many that is no through
+     * @param array<string, LogicException> $unresolvable the framework's error for every declared many_many it cannot
+     *                                                    resolve, raised only when a key names it
      * @param array<string, mixed> $defaults static defaults of columns and composites, leaf class first
-     * @param array<string, list<string>>|null $localisedTables localised fields by table; null when the class is
+     * @param bool $isLocale whether the class is Fluent's Locale, whose records add the locale codes a load knows
+     * @param array<string, list<string>>|null $localisedTables localised columns by table; null when the class is
      *                                                     not localised
      * @param bool $localisedStages whether the localised tables have `_Live` and `_Versions` tables, which only
      *                              FluentVersionedExtension adds
@@ -37,13 +43,16 @@ final readonly class ClassSchema
         public string $class,
         public string $baseTable,
         public array $tables,
-        public array $columnTables,
-        private array $specs,
-        private array $generated,
+        public array $fieldTables,
+        public array $specs,
+        private array $kinds,
+        public array $joins,
+        private array $unresolvable,
         public array $defaults,
         public bool $versioned,
         public bool $staged,
         public bool $isFile,
+        public bool $isLocale,
         public ?array $localisedTables,
         public bool $localisedStages,
     ) {
@@ -56,33 +65,36 @@ final readonly class ClassSchema
     {
         $schema = DataObject::getSchema();
         $tables = [];
-        $columnTables = [];
+        $fieldTables = [];
         foreach (ClassInfo::ancestry($class, true) as $tableClass) {
             $table = (string) $schema->tableName($tableClass);
             $tables[] = $table;
-            foreach (array_keys($schema->databaseFields($tableClass, false)) as $column) {
-                $columnTables[(string) $column] = $table;
+            $fields = [...$schema->databaseFields($tableClass, false), ...$schema->compositeFields($tableClass, false)];
+            foreach (array_keys($fields) as $field) {
+                $fieldTables[(string) $field] = $table;
             }
         }
 
-        unset($columnTables['ID']);
+        unset($fieldTables['ID']);
         /** @var array<string, string> $specs */
         $specs = array_merge($schema->databaseFields($class), $schema->compositeFields($class));
-        /** @var array<string, string> $generated */
-        $generated = $schema->generatedFields($class);
         $versioned = class_exists(Versioned::class) && $class::has_extension(Versioned::class);
+        [$kinds, $joins, $unresolvable] = self::relationsOf($class, $versioned);
 
         return new self(
             $class,
             $schema->baseDataTable($class),
             $tables,
-            $columnTables,
+            $fieldTables,
             $specs,
-            $generated,
+            $kinds,
+            $joins,
+            $unresolvable,
             self::defaultsOf($class, $specs),
             $versioned,
             $versioned && self::hasStages($class),
             is_a($class, File::class, true),
+            is_a($class, Locale::class, true),
             self::localisedTablesOf($class),
             class_exists(FluentVersionedExtension::class) && $class::has_extension(FluentVersionedExtension::class),
         );
@@ -90,56 +102,75 @@ final readonly class ClassSchema
 
     public function kind(string $key): FieldKind
     {
-        $schema = DataObject::getSchema();
-
-        return match (true) {
-            in_array($key, ['ID', 'ClassName'], true), $this->versioned && $key === 'Version' => FieldKind::Fixed,
-            isset($this->generated[$key]) => FieldKind::Generated,
-            $schema->hasOneComponent($this->class, $key) !== null => FieldKind::HasOne,
-            $schema->hasManyComponent($this->class, $key) !== null,
-            $schema->belongsToComponent($this->class, $key) !== null => FieldKind::HasMany,
-            $this->isManyManyThrough($schema, $key) => FieldKind::ManyManyThrough,
-            $schema->manyManyComponent($this->class, $key) !== null => FieldKind::ManyMany,
-            isset($this->columnTables[$key]), isset($this->specs[$key]) => FieldKind::Value,
-            default => FieldKind::Unknown,
-        };
-    }
-
-    /**
-     * The database values a column or composite takes for a value, converted by its field type as write() does.
-     *
-     * @return array<string, mixed>
-     */
-    public function columnValues(string $key, mixed $value): array
-    {
-        return self::convert($this->specs[$key], $key, $value);
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    public static function convert(string $spec, string $name, mixed $value): array
-    {
-        $field = Injector::inst()->create($spec, $name);
-        assert($field instanceof DBField);
-        $field->setValue($value);
-        $manipulation = [];
-        $field->writeToManipulation($manipulation);
-        $fields = $manipulation['fields'] ?? [];
-
-        $values = [];
-        foreach (is_array($fields) ? $fields : [] as $column => $value) {
-            $values[(string) $column] = $value;
+        if (isset($this->kinds[$key])) {
+            return $this->kinds[$key];
         }
 
-        return $values;
+        if (isset($this->unresolvable[$key])) {
+            throw $this->unresolvable[$key];
+        }
+
+        return isset($this->fieldTables[$key]) || isset($this->specs[$key]) ? FieldKind::Value : FieldKind::Unknown;
     }
 
-    private function isManyManyThrough(DataObjectSchema $schema, string $key): bool
+    /**
+     * The kind of every key that is no plain value, the first that claims a name winning: the fixed and generated
+     * columns, then has_one, has_many and belongs_to, then many_many. The framework resolves a many_many only when it
+     * is used, so one it cannot resolve keeps its error for the key that names it instead of failing the class.
+     *
+     * @param class-string<DataObject> $class
+     *
+     * @return array{array<string, FieldKind>, array<string, array{join: string, parentField: string, childField: string, extraFields: array<string, string>}>, array<string, LogicException>}
+     */
+    private static function relationsOf(string $class, bool $versioned): array
     {
-        $component = $schema->manyManyComponent($this->class, $key);
+        $schema = DataObject::getSchema();
+        $kinds = ['ID' => FieldKind::Fixed, 'ClassName' => FieldKind::Fixed];
+        if ($versioned) {
+            $kinds['Version'] = FieldKind::Fixed;
+        }
 
-        return is_array($component) && $component['relationClass'] === ManyManyThroughList::class;
+        $kinds += array_fill_keys(array_map(strval(...), array_keys($schema->generatedFields($class))), FieldKind::Generated);
+        $kinds += array_fill_keys(self::configKeys($class, 'has_one'), FieldKind::HasOne);
+        $kinds += array_fill_keys([...self::configKeys($class, 'has_many'), ...self::configKeys($class, 'belongs_to')], FieldKind::HasMany);
+        $joins = [];
+        $unresolvable = [];
+        foreach ([...self::configKeys($class, 'many_many'), ...self::configKeys($class, 'belongs_many_many')] as $name) {
+            try {
+                /** @var array{relationClass: string, join: string, parentField: string, childField: string} $component declared */
+                $component = $schema->manyManyComponent($class, $name);
+            } catch (LogicException $exception) {
+                $unresolvable[$name] = $exception;
+                continue;
+            }
+
+            $through = $component['relationClass'] === ManyManyThroughList::class;
+            $kinds += [$name => $through ? FieldKind::ManyManyThrough : FieldKind::ManyMany];
+            if (!$through) {
+                /** @var array<string, string> $extraFields */
+                $extraFields = $schema->manyManyExtraFieldsForComponent($class, $name) ?? [];
+                $joins[$name] = [
+                    'join' => $component['join'],
+                    'parentField' => $component['parentField'],
+                    'childField' => $component['childField'],
+                    'extraFields' => $extraFields,
+                ];
+            }
+        }
+
+        return [$kinds, $joins, $unresolvable];
+    }
+
+    /**
+     * @param class-string<DataObject> $class
+     *
+     * @return list<string> the names a relation config of the class declares, inherited ones included
+     */
+    private static function configKeys(string $class, string $relation): array
+    {
+        $declared = Config::inst()->get($class, $relation);
+
+        return array_map(strval(...), array_keys(is_array($declared) ? $declared : []));
     }
 
     /**

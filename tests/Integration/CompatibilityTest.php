@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace WeDevelop\Fixtures\Tests\Integration;
 
+use PHPUnit\Framework\Attributes\CoversNothing;
 use SilverStripe\Dev\SapphireTest;
 use SilverStripe\ORM\FieldType\DBDatetime;
 use WeDevelop\Fixtures\FixtureLoader;
 use WeDevelop\Fixtures\Tests\Integration\Model\Plain;
 use WeDevelop\Fixtures\Tests\Integration\Model\PlainLink;
+use WeDevelop\Fixtures\Tests\Integration\Model\PricedRecord;
 use WeDevelop\Fixtures\Tests\Integration\Model\Sub;
 use WeDevelop\Fixtures\Tests\Integration\Model\SubWithoutTable;
 use WeDevelop\Fixtures\Tests\Integration\Model\Tag;
@@ -17,6 +19,7 @@ use WeDevelop\Fixtures\Tests\Integration\Model\Tag;
  * The loader's rows must equal the rows write() leaves for the same records: the only guard that a directly
  * written row is a row the ORM would have written.
  */
+#[CoversNothing]
 final class CompatibilityTest extends SapphireTest
 {
     use RowSnapshot;
@@ -38,6 +41,7 @@ final class CompatibilityTest extends SapphireTest
         SubWithoutTable::class,
         Tag::class,
         PlainLink::class,
+        PricedRecord::class,
     ];
 
     protected function setUp(): void
@@ -63,6 +67,31 @@ final class CompatibilityTest extends SapphireTest
         }
 
         $this->assertSame($written, $this->snapshot(self::TABLES, $ids));
+    }
+
+    public function testAColumnAndItsCompositeAreWrittenInTheOrderEachWasFirstSetADefaultFirst(): void
+    {
+        $tables = ['FixturesTest_PricedRecord'];
+        $columnAfter = PricedRecord::create();
+        $columnAfter->update(['Title' => 'Column after the composite', 'Price' => ['Amount' => 10, 'Currency' => 'EUR'], 'PriceCurrency' => 'USD']);
+        $columnAfter->write();
+        $compositeAfter = PricedRecord::create();
+        $compositeAfter->update(['Title' => 'Composite after the column', 'PriceCurrency' => 'USD', 'Price' => ['Amount' => 20, 'Currency' => 'GBP']]);
+        $compositeAfter->write();
+        $written = $this->snapshot($tables, ['column-after' => $columnAfter->ID, 'composite-after' => $compositeAfter->ID]);
+        $this->assertSame(
+            ['Column after the composite' => 'EUR', 'Composite after the column' => 'GBP'],
+            array_column($written['FixturesTest_PricedRecord'], 'PriceCurrency', 'Title'),
+            'the composite set after its column, a default first, is written over it',
+        );
+        $this->emptyTables($tables);
+
+        $loaded = FixtureLoader::singleton()->load(__DIR__ . '/fixtures/priced.yml');
+
+        $this->assertSame($written, $this->snapshot($tables, [
+            'column-after' => $loaded->idOf(PricedRecord::class, 'column-after'),
+            'composite-after' => $loaded->idOf(PricedRecord::class, 'composite-after'),
+        ]));
     }
 
     /**

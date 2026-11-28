@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace WeDevelop\Fixtures\Tests\Integration;
 
+use PHPUnit\Framework\Attributes\CoversClass;
 use SilverStripe\Core\Config\Config;
 use SilverStripe\Dev\SapphireTest;
 use SilverStripe\ORM\DataObject;
@@ -12,11 +13,19 @@ use SilverStripe\ORM\FieldType\DBDatetime;
 use SilverStripe\Versioned\Versioned;
 use WeDevelop\Fixtures\FixtureLoader;
 use WeDevelop\Fixtures\InvalidFixtureException;
+use WeDevelop\Fixtures\Load\LoadPlanner;
 use WeDevelop\Fixtures\LoadedFixtures;
+use WeDevelop\Fixtures\Reset\DatabaseReset;
+use WeDevelop\Fixtures\Schema\ClassSchema;
+use WeDevelop\Fixtures\Tests\Integration\Model\PricedRecord;
 use WeDevelop\Fixtures\Tests\Integration\Model\UnstagedRecord;
 use WeDevelop\Fixtures\Tests\Integration\Model\VersionedRecord;
 use WeDevelop\Fixtures\Tests\Integration\Model\VersionedSub;
 
+#[CoversClass(FixtureLoader::class)]
+#[CoversClass(ClassSchema::class)]
+#[CoversClass(LoadPlanner::class)]
+#[CoversClass(DatabaseReset::class)]
 final class VersionedFixtureTest extends SapphireTest
 {
     use RowSnapshot;
@@ -29,10 +38,12 @@ final class VersionedFixtureTest extends SapphireTest
         VersionedRecord::class,
         VersionedSub::class,
         UnstagedRecord::class,
+        PricedRecord::class,
     ];
 
     protected static $required_extensions = [
         VersionedRecord::class => [Versioned::class],
+        PricedRecord::class => [Versioned::class],
     ];
 
     public static function setUpBeforeClass(): void
@@ -144,6 +155,33 @@ final class VersionedFixtureTest extends SapphireTest
         $this->assertSame($this->latestVersions($written, 2), $this->snapshot($tables, [
             'changed' => $loaded->idOf(VersionedRecord::class, 'changed'),
             'sub' => $loaded->idOf(VersionedSub::class, 'sub'),
+        ]));
+    }
+
+    public function testADraftValueOfAColumnHasTheRowsAnEditAfterPublishingLeavesThoughTheRecordStatesItsComposite(): void
+    {
+        $tables = ['FixturesTest_PricedRecord', 'FixturesTest_PricedRecord_Live', 'FixturesTest_PricedRecord_Versions'];
+        DBDatetime::set_mock_now('2026-11-27 10:00:00');
+        $this->logOut();
+        $changed = PricedRecord::create();
+        $changed->update(['Title' => 'Changed', 'Price' => ['Amount' => 10, 'Currency' => 'EUR']]);
+        $changed->write();
+        $changed->publishSingle();
+        // An edit saved after publishing works on the record as read back, not on the composite value this object
+        // still holds, which write() would write over the column again
+        $edit = PricedRecord::get()->byID($changed->ID);
+        $this->assertNotNull($edit);
+        $edit->PriceCurrency = 'USD';
+        $edit->write();
+        $written = $this->snapshot($tables, ['changed' => $changed->ID]);
+
+        $this->assertSame(['USD'], array_column($written['FixturesTest_PricedRecord'], 'PriceCurrency'), 'the draft holds the edit');
+        $this->emptyTables($tables);
+
+        $loaded = FixtureLoader::singleton()->load(self::FIXTURES . 'priced-draft.yml');
+
+        $this->assertSame($this->latestVersions($written, 2), $this->snapshot($tables, [
+            'changed' => $loaded->idOf(PricedRecord::class, 'changed'),
         ]));
     }
 

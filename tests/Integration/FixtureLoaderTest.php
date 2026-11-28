@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace WeDevelop\Fixtures\Tests\Integration;
 
+use LogicException;
+use PHPUnit\Framework\Attributes\CoversClass;
 use SilverStripe\Control\Director;
 use SilverStripe\Core\Config\Config;
 use SilverStripe\Core\Injector\Injector;
@@ -11,16 +13,36 @@ use SilverStripe\Core\Kernel;
 use SilverStripe\Dev\SapphireTest;
 use SilverStripe\ORM\Connect\DatabaseException;
 use SilverStripe\ORM\DB;
+use SilverStripe\ORM\FieldType\DBDatetime;
 use WeDevelop\Fixtures\FixtureLedger;
 use WeDevelop\Fixtures\FixtureLoader;
 use WeDevelop\Fixtures\InvalidFixtureException;
+use WeDevelop\Fixtures\Load\LoadPlanner;
+use WeDevelop\Fixtures\Load\LookupFetcher;
+use WeDevelop\Fixtures\Load\RowWriter;
+use WeDevelop\Fixtures\Reset\DatabaseReset;
 use WeDevelop\Fixtures\ResetRefusedException;
+use WeDevelop\Fixtures\Schema\ClassSchema;
+use WeDevelop\Fixtures\Schema\SchemaMap;
+use WeDevelop\Fixtures\Schema\ValueConverter;
+use WeDevelop\Fixtures\Tests\Integration\Model\Coordinate;
 use WeDevelop\Fixtures\Tests\Integration\Model\Plain;
 use WeDevelop\Fixtures\Tests\Integration\Model\PlainLink;
 use WeDevelop\Fixtures\Tests\Integration\Model\Sub;
 use WeDevelop\Fixtures\Tests\Integration\Model\SubWithoutTable;
 use WeDevelop\Fixtures\Tests\Integration\Model\Tag;
 
+#[CoversClass(FixtureLoader::class)]
+#[CoversClass(SchemaMap::class)]
+#[CoversClass(ClassSchema::class)]
+#[CoversClass(LookupFetcher::class)]
+#[CoversClass(LoadPlanner::class)]
+#[CoversClass(ValueConverter::class)]
+#[CoversClass(RowWriter::class)]
+#[CoversClass(DatabaseReset::class)]
+#[CoversClass(FixtureLedger::class)]
+#[CoversClass(InvalidFixtureException::class)]
+#[CoversClass(ResetRefusedException::class)]
 final class FixtureLoaderTest extends SapphireTest
 {
     private const string FIXTURES = __DIR__ . '/fixtures/';
@@ -38,7 +60,27 @@ final class FixtureLoaderTest extends SapphireTest
         SubWithoutTable::class,
         Tag::class,
         PlainLink::class,
+        Coordinate::class,
     ];
+
+    public function testAStatedCreatedOrLastEditedThatDbDatetimeStoresAsNullTakesTheLoadsTime(): void
+    {
+        DBDatetime::set_mock_now('2026-11-27 10:00:00');
+
+        FixtureLoader::singleton()->load(self::FIXTURES . 'timestamps.yml');
+
+        $this->assertSame(
+            [
+                ['Zero', '2026-11-27 10:00:00', '2026-11-27 10:00:00'],
+                ['Empty', '2026-11-27 10:00:00', '2026-11-27 10:00:00'],
+                ['Stated', '2020-01-02 00:00:00', '2020-01-03 04:05:06'],
+            ],
+            array_map(
+                static fn (array $row): array => array_values($row),
+                iterator_to_array(DB::query('SELECT "Title", "Created", "LastEdited" FROM "FixturesTest_Tag" ORDER BY "ID"'), false),
+            ),
+        );
+    }
 
     public function testItLoadsFilesTogetherAndAnswersIdsInDeclarationOrder(): void
     {
@@ -220,6 +262,27 @@ final class FixtureLoaderTest extends SapphireTest
         $this->assertSame($count ** 2, (int) DB::query('SELECT COUNT(*) FROM "FixturesTest_Plain_Related"')->value());
         $last = Plain::get()->byID($loaded->idOf(Plain::class, 'plain' . $count));
         $this->assertSame($count, $last?->Related()->count());
+    }
+
+    public function testFloatsThatPrintAlikeAreEachWrittenAsStated(): void
+    {
+        $loaded = FixtureLoader::singleton()->load(self::FIXTURES . 'coordinates.yml');
+
+        $latitude = static fn (string $key): float => (float) Coordinate::get()->byID($loaded->idOf(Coordinate::class, $key))?->Latitude;
+        $this->assertSame([52.37022216671234, 52.370222166712], [$latitude('precise'), $latitude('rounded')]);
+    }
+
+    public function testAManyManyTheFrameworkCannotResolveFailsOnlyALoadThatUsesIt(): void
+    {
+        Config::modify()->merge(Tag::class, 'belongs_many_many', ['Ghosts' => 'App\\Missing']);
+
+        $loaded = FixtureLoader::singleton()->load(self::FIXTURES . 'tags.yml');
+        $this->assertSame(['red', 'blue'], array_keys($loaded->toArray()[Tag::class]));
+
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('belongs_many_many relation ' . Tag::class . '.Ghosts points to App\\Missing which does not exist');
+
+        FixtureLoader::singleton()->load(self::FIXTURES . 'broken-relation.yml');
     }
 
     public function testResetRemovesTheLoadedRecordsAndTheConfiguredClassesOnly(): void

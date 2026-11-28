@@ -4,12 +4,17 @@ declare(strict_types=1);
 
 namespace WeDevelop\Fixtures\Tests\Integration\TwoProcess;
 
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
+use WeDevelop\Fixtures\FixtureLoader;
+use WeDevelop\Fixtures\Reset\DatabaseReset;
 
 /**
  * A load from the CLI and a reset over HTTP share the ledger, because it lives in the database. Runs against the
  * harness app's own database and web server, outside SapphireTest's temporary database.
  */
+#[CoversClass(FixtureLoader::class)]
+#[CoversClass(DatabaseReset::class)]
 final class LoadAndResetAcrossProcessesTest extends TestCase
 {
     private const string SCRIPTS = __DIR__ . '/scripts/';

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace WeDevelop\Fixtures\Tests\Integration;
 
 use Page;
+use PHPUnit\Framework\Attributes\CoversClass;
 use SilverStripe\CMS\Model\SiteTree;
 use SilverStripe\Dev\SapphireTest;
 use SilverStripe\ORM\DataObject;
@@ -18,12 +19,20 @@ use TractorCow\Fluent\Model\Locale;
 use TractorCow\Fluent\State\FluentState;
 use WeDevelop\Fixtures\FixtureLoader;
 use WeDevelop\Fixtures\InvalidFixtureException;
+use WeDevelop\Fixtures\Load\LookupFetcher;
 use WeDevelop\Fixtures\LoadedFixtures;
+use WeDevelop\Fixtures\Reset\DatabaseReset;
+use WeDevelop\Fixtures\Schema\ClassSchema;
 use WeDevelop\Fixtures\Tests\Integration\Model\LocalisedRecord;
 use WeDevelop\Fixtures\Tests\Integration\Model\LocalisedSub;
 use WeDevelop\Fixtures\Tests\Integration\Model\PlainFluentRecord;
+use WeDevelop\Fixtures\Tests\Integration\Model\PricedRecord;
 use WeDevelop\Fixtures\Tests\Integration\Model\Tag;
 
+#[CoversClass(FixtureLoader::class)]
+#[CoversClass(ClassSchema::class)]
+#[CoversClass(LookupFetcher::class)]
+#[CoversClass(DatabaseReset::class)]
 final class FluentFixtureTest extends SapphireTest
 {
     use RowSnapshot;
@@ -37,11 +46,13 @@ final class FluentFixtureTest extends SapphireTest
         LocalisedRecord::class,
         LocalisedSub::class,
         PlainFluentRecord::class,
+        PricedRecord::class,
     ];
 
     protected static $required_extensions = [
         LocalisedRecord::class => [Versioned::class, FluentVersionedExtension::class],
         PlainFluentRecord::class => [Versioned::class, FluentExtension::class],
+        PricedRecord::class => [Versioned::class, FluentVersionedExtension::class],
     ];
 
     public static function getExtraDataObjects(): array
@@ -156,6 +167,35 @@ final class FluentFixtureTest extends SapphireTest
         }
     }
 
+    public function testALocalesValueOfAColumnHasTheRowsASaveInThatLocaleLeavesThoughTheRecordStatesItsComposite(): void
+    {
+        $this->requireFluent();
+        $tables = ['FixturesTest_PricedRecord_Localised', 'FixturesTest_PricedRecord_Localised_Live', 'FixturesTest_PricedRecord_Localised_Versions'];
+        FixtureLoader::singleton()->load(self::FIXTURES . 'locales.yml');
+        DBDatetime::set_mock_now('2026-11-27 10:00:00');
+        $this->logOut();
+        $priced = PricedRecord::create();
+        $this->writeInLocale('en_US', $priced, ['Title' => 'Priced', 'Price' => ['Amount' => 5, 'Currency' => 'USD']], true);
+        // Saved in another locale as an edit is, on the record as read back: this object still holds the composite
+        // value, which write() would write over the column again
+        $translated = PricedRecord::get()->byID($priced->ID);
+        $this->assertNotNull($translated);
+        $this->writeInLocale('nl_NL', $translated, ['PriceCurrency' => 'GBP'], true);
+        $written = $this->snapshot($tables, ['priced' => $priced->ID]);
+        $this->assertSame(
+            ['en_US' => 'USD', 'nl_NL' => 'GBP'],
+            array_column($written['FixturesTest_PricedRecord_Localised'], 'PriceCurrency', 'Locale'),
+            'each locale holds its own value',
+        );
+        $this->emptyTables($tables);
+
+        $loaded = FixtureLoader::singleton()->load(self::FIXTURES . 'priced-localised.yml');
+
+        $this->assertSame($this->latestVersions($written, 1), $this->snapshot($tables, [
+            'priced' => $loaded->idOf(PricedRecord::class, 'priced'),
+        ]));
+    }
+
     public function testAPageShowsEachLanguageWithItsOwnTitle(): void
     {
         $this->requireFluent();
@@ -234,7 +274,7 @@ final class FluentFixtureTest extends SapphireTest
         $this->assertSame([0, 0, 0, 0, 0, 0], array_values($this->localisedRowCounts()));
     }
 
-    public function testEveryLocalisedValueMustBeATranslatedField(): void
+    public function testAnInvalidSetOfValuesPerLanguageListsEveryProblemAndWritesNothing(): void
     {
         $this->requireFluent();
 
@@ -254,23 +294,9 @@ final class FluentFixtureTest extends SapphireTest
                 $exception->getProblems(),
             );
         }
-    }
-
-    public function testDraftValuesCannotBeCombinedWithValuesPerLanguage(): void
-    {
-        $this->requireFluent();
-
-        try {
-            FixtureLoader::singleton()->load(self::FIXTURES . 'locales.yml', self::FIXTURES . 'localised-draft.yml');
-            $this->fail('Draft values with values per language must be refused');
-        } catch (InvalidFixtureException $exception) {
-            $this->assertSame(
-                [self::FIXTURES . 'localised-draft.yml, ' . LocalisedRecord::class . '.home: "@draft" cannot be combined with "@locales"'],
-                $exception->getProblems(),
-            );
-        }
 
         $this->assertSame(0, LocalisedRecord::get()->count());
+        $this->assertSame(0, Locale::get()->count(), 'not even the locales of the other file');
     }
 
     private static function fluentInstalled(): bool
@@ -323,7 +349,7 @@ final class FluentFixtureTest extends SapphireTest
     /**
      * @param array<string, mixed> $values
      */
-    private function writeInLocale(string $locale, LocalisedSub|PlainFluentRecord $record, array $values, bool $publish): void
+    private function writeInLocale(string $locale, LocalisedSub|PlainFluentRecord|PricedRecord $record, array $values, bool $publish): void
     {
         FluentState::singleton()->withState(static function (FluentState $state) use ($locale, $record, $values, $publish): void {
             $state->setLocale($locale);

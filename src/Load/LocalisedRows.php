@@ -15,36 +15,47 @@ final class LocalisedRows
     private const string SUFFIX = '_Localised';
 
     /**
-     * @param array<string, array<string, mixed>> $draftRows by table, each with the record's ID
+     * @param array<string, array{array<string, mixed>, array<string, string>}> $draftRows by table: each row with the
+     *                                                                              record's ID, and the specs of
+     *                                                                              its raw values
      */
     public static function add(Plan $plan, ClassSchema $schema, FixtureRecord $record, array $draftRows): void
     {
         $id = $plan->idOf($record->key());
         foreach ($record->locales as $locale => $values) {
-            $localeValues = [];
-            foreach ($values as $field => $value) {
-                $localeValues = [...$localeValues, ...$schema->columnValues($field, $value)];
-            }
-
-            foreach ($schema->localisedTables ?? [] as $table => $fields) {
+            foreach ($schema->localisedTables ?? [] as $table => $localised) {
                 // Every table, even one the record states nothing of: a first write in a locale forces every field
-                // as changed, so Fluent localises each table of the chain
-                $row = array_intersect_key([...$draftRows[$table], ...$localeValues], array_flip($fields));
-                self::addRow($plan, $schema, $table . self::SUFFIX, ['RecordID' => $id, 'Locale' => $locale, ...$row], $record->published === true);
+                // as changed, so Fluent localises each table of the chain. A composite converts to columns of
+                // which Fluent may localise only some, so the row keeps its localised columns once converted. The
+                // locale's values come last: saved in that locale, they are not written over by the record's composite.
+                $columns = array_fill_keys(['RecordID', 'Locale', ...$localised], true);
+                $localeValues = array_intersect_key($values, $columns);
+                [$row, $specs] = $draftRows[$table];
+                self::addRow(
+                    $plan,
+                    $schema,
+                    $table . self::SUFFIX,
+                    ['RecordID' => $id, 'Locale' => $locale, ...array_diff_key($row, $localeValues), ...$localeValues],
+                    [...$specs, ...array_intersect_key($schema->specs, $localeValues)],
+                    $columns,
+                    $record->published === true,
+                );
             }
         }
     }
 
     /**
      * @param array<string, mixed> $row
+     * @param array<string, string> $specs
+     * @param array<string, true> $columns
      */
-    private static function addRow(Plan $plan, ClassSchema $schema, string $table, array $row, bool $published): void
+    private static function addRow(Plan $plan, ClassSchema $schema, string $table, array $row, array $specs, array $columns, bool $published): void
     {
-        $plan->add($table, $row);
+        $plan->add($table, $row, $specs, $columns);
         if ($schema->localisedStages) {
-            $plan->add($table . '_Versions', [...$row, 'Version' => VersionedRows::VERSION]);
+            $plan->add($table . '_Versions', [...$row, 'Version' => VersionedRows::VERSION], $specs, [...$columns, 'Version' => true]);
             if ($published) {
-                $plan->add($table . '_Live', $row);
+                $plan->add($table . '_Live', $row, $specs, $columns);
             }
         }
     }

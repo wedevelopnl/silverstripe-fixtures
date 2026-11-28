@@ -39,7 +39,7 @@ final class Condition
     }
 
     /**
-     * @return array{string, list<int>} a WHERE clause on the column and its parameters
+     * @return array<string, list<int>> a WHERE clause on the column with its parameters
      */
     public function toSql(string $column): array
     {
@@ -56,6 +56,6 @@ final class Condition
             $parameters = [...$parameters, ...array_values($this->ids)];
         }
 
-        return ['(' . implode(' OR ', $clauses) . ')', $parameters];
+        return ['(' . implode(' OR ', $clauses) . ')' => $parameters];
     }
 }

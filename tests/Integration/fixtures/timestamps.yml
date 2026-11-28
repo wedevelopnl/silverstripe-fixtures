@@ -1,0 +1,14 @@
+# Each value DBDatetime stores as NULL, and two it stores as stated
+WeDevelop\Fixtures\Tests\Integration\Model\Tag:
+  zero:
+    Title: Zero
+    Created: '0000-00-00 00:00:00'
+    LastEdited: '0000-00-00'
+  empty:
+    Title: Empty
+    Created: ''
+    LastEdited: ~
+  stated:
+    Title: Stated
+    Created: '2020-01-02'
+    LastEdited: '2020-01-03 04:05:06'
